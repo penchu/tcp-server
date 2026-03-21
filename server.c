@@ -13,6 +13,12 @@ int main(void) {
         return -1;
     }
     // printf("serverid: %d\n", sockfd);
+    int opt = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt");
+        return -1;
+    } //should tell the OS to let you reuse the port even if it's in TIME_WAIT.
+
 
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
@@ -30,21 +36,27 @@ int main(void) {
         return -1;
     }
 
-    while (1) {
+    // while (1) {
+    printf("waiting for connection...\n");
         socklen_t peer_addr_size;
         struct sockaddr_in peer_addr;
         peer_addr_size = sizeof(peer_addr);
         int clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
         if (clientfd < 0) {
             perror("accept");
-            continue;
+            // continue;
         }
+
+        char buff[128];
+        int rcv_srvr = recv(clientfd, buff, 128, 0);
+        buff[rcv_srvr] = '\0';
+        printf("msg: %s\n", buff);
 
         if (close(clientfd) == -1) {
             perror("close");
             return -1;    
         }
-    }
+    // }
 
     close(sockfd);
     
