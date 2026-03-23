@@ -19,7 +19,6 @@ int main(void) {
         return -1;
     } //should tell the OS to let you reuse the port even if it's in TIME_WAIT.
 
-
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -30,23 +29,26 @@ int main(void) {
         close(sockfd);
         return -1;
     }
-
+    
     if (listen(sockfd, 5) < 0) {
         perror("listen");
         return -1;
     }
 
-    // while (1) {
-    printf("waiting for connection...\n");
-        socklen_t peer_addr_size;
+    while (1) {   
         struct sockaddr_in peer_addr;
-        peer_addr_size = sizeof(peer_addr);
+        socklen_t peer_addr_size = sizeof(peer_addr);
+        printf("waiting for connection...\n");
+        
         int clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
+        // int clientfd = accept(sockfd, NULL, NULL);
+        printf("clientfd: %d\n", clientfd);
         if (clientfd < 0) {
             perror("accept");
-            // continue;
+            continue;
         }
-
+        printf("connection accepted\n");
+        
         char buff[128];
         int rcv_srvr = recv(clientfd, buff, 128, 0);
         buff[rcv_srvr] = '\0';
@@ -56,7 +58,7 @@ int main(void) {
             perror("close");
             return -1;    
         }
-    // }
+    }
 
     close(sockfd);
     
