@@ -4,7 +4,10 @@
 #include <unistd.h> 
 #include <sys/types.h> 
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/in.h>
+
+#define MAX_CLIENTS 10
 
 int main(void) {
     int sockfd;
@@ -12,7 +15,7 @@ int main(void) {
         perror("socket");
         return -1;
     }
-    // printf("serverid: %d\n", sockfd);
+    
     int opt = 1;
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("setsockopt");
@@ -36,13 +39,34 @@ int main(void) {
     }
 
     while (1) {   
+
+        int client_fds[MAX_CLIENTS]
+
+        int retval;
+        fd_set rfds;
+        struct timeval tv;
+        /* Watch stdin (fd 0) to see when it has input.  */
+        FD_ZERO(&rfds);
+        FD_SET(sockfd,  &rfds);
+        /* Wait up to five seconds.  */
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+
+        retval = select(1, &rfds, NULL, NULL, &tv);
+        /* Don't rely on the value of tv now! */
+        if (retval < 0) {
+            perror("select");
+            continue;
+        }
+        else if (retval) printf("Data is available now.\n");
+        /* FD_ISSET(0, &rfds) will be true.  */
+        else printf("No data within five seconds.\n");
+
+
         struct sockaddr_in peer_addr;
         socklen_t peer_addr_size = sizeof(peer_addr);
-        printf("waiting for connection...\n");
-        
+        printf("waiting for connection...\n");        
         int clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
-        // int clientfd = accept(sockfd, NULL, NULL);
-        printf("clientfd: %d\n", clientfd);
         if (clientfd < 0) {
             perror("accept");
             continue;
