@@ -38,45 +38,95 @@ int main(void) {
         return -1;
     }
 
-    while (1) {   
+    int client_fds[MAX_CLIENTS];
+    memset(client_fds, -1, sizeof(client_fds));  
+    int sel_val;
+    fd_set master_set;
+    struct timeval tv;
+    FD_ZERO(&master_set);
+    FD_SET(sockfd,  &master_set);
+    /* Wait up to five seconds.  */
+    // tv.tv_sec = 5;
+    // tv.tv_usec = 0;
 
-        int client_fds[MAX_CLIENTS]
+    int max_fd;
+    int clientfd;
+    char buff[128];
+    int rcv_srvr;
 
-        int retval;
-        fd_set rfds;
-        struct timeval tv;
-        /* Watch stdin (fd 0) to see when it has input.  */
-        FD_ZERO(&rfds);
-        FD_SET(sockfd,  &rfds);
-        /* Wait up to five seconds.  */
-        tv.tv_sec = 5;
-        tv.tv_usec = 0;
+    struct sockaddr_in peer_addr;
+    socklen_t peer_addr_size = sizeof(peer_addr);   
+    
+    while (1) {  
+        // int client_fds[MAX_CLIENTS];
+        // memset(client_fds, -1, sizeof(client_fds));
+        // int sel_val;
+        // // fd_set rfds;
+        // fd_set master_set;
+        // struct timeval tv;
+        // FD_ZERO(&master_set);
+        // FD_SET(sockfd,  &master_set);
+        // /* Wait up to five seconds.  */
+        // tv.tv_sec = 5;
+        // tv.tv_usec = 0;
+        // int max_fd = 1;
+        // int clientfd;
+        // char buff[128];
+        // int rcv_srvr;
+        // struct sockaddr_in peer_addr;
+        // socklen_t peer_addr_size = sizeof(peer_addr);        
+        fd_set read_set = master_set;
 
-        retval = select(1, &rfds, NULL, NULL, &tv);
-        /* Don't rely on the value of tv now! */
-        if (retval < 0) {
+        sel_val = select(max_fd+1, &read_set, NULL, NULL, NULL);
+        if (sel_val < 0) {
             perror("select");
             continue;
         }
-        else if (retval) printf("Data is available now.\n");
-        /* FD_ISSET(0, &rfds) will be true.  */
-        else printf("No data within five seconds.\n");
-
-
-        struct sockaddr_in peer_addr;
-        socklen_t peer_addr_size = sizeof(peer_addr);
-        printf("waiting for connection...\n");        
-        int clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
-        if (clientfd < 0) {
-            perror("accept");
-            continue;
+        else if (sel_val) {
+            for (int i = 0; i <= max_fd; i++) {
+                if (FD_ISSET(i, &read_set) == 1) {
+                    if (i == sockfd) {
+                        clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
+                        if (clientfd < 0) {
+                            perror("accept");
+                            continue;
+                        }  
+                        if (clientfd > max_fd) max_fd = clientfd;   
+                        FD_SET(clientfd, &master_set);                
+                    }
+                    else {
+                        rcv_srvr = recv(i, buff, 128, 0);
+                        if (rcv_srvr < 0) {
+                            perror("receive");
+                            continue;
+                        }
+                        else if (rcv_srvr > 0) {
+                            buff[rcv_srvr] = '\0';
+                            printf("msg: %s\n", buff);
+                        }
+                        else {
+                            FD_CLR(i, &master_set);
+                            close(i);
+                        }                        
+                    }
+                }
+            }
         }
-        printf("connection accepted\n");
+
+        // struct sockaddr_in peer_addr;
+        // socklen_t peer_addr_size = sizeof(peer_addr);
+        // printf("waiting for connection...\n");        
+        // int clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
+        // if (clientfd < 0) {
+        //     perror("accept");
+        //     continue;
+        // }
+        // printf("connection accepted\n");
         
-        char buff[128];
-        int rcv_srvr = recv(clientfd, buff, 128, 0);
-        buff[rcv_srvr] = '\0';
-        printf("msg: %s\n", buff);
+        // char buff[128];
+        // int rcv_srvr = recv(clientfd, buff, 128, 0);
+        // buff[rcv_srvr] = '\0';
+        // printf("msg: %s\n", buff);
 
         if (close(clientfd) == -1) {
             perror("close");

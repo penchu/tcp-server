@@ -14,13 +14,13 @@ int main(void) {
         return -1;
     }
     
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(8080);
+    struct sockaddr_in client_addr;
+    memset(&client_addr, 0, sizeof(client_addr));
+    client_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = htons(8080);
 
-    int connect_id = connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    int connect_id = connect(sockfd, (struct sockaddr*)&client_addr, sizeof(client_addr));
     if (connect_id < 0) {
         perror("connect");
         close(sockfd);
