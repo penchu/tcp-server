@@ -28,8 +28,14 @@ int main(void) {
     }
     
     char buff[128] = "hello, server!";
-    int send_srvr = send(sockfd, buff, 15, 0);    
-    sleep(10);
+    int send_srvr = send(sockfd, buff, 15, 0);  
+
+    char buff_rcv[128];
+    int rcv_clnt = recv(sockfd, buff_rcv, 128, 0);
+    buff_rcv[rcv_clnt] = '\0';
+    printf("msg: %s\n", buff_rcv);
+
+    sleep(5);
     close(sockfd);
     return 0;
 }
