@@ -40,16 +40,14 @@ int main(void) {
 
     int client_fds[MAX_CLIENTS];
     memset(client_fds, -1, sizeof(client_fds));  
+
     int sel_val;
     fd_set master_set;
     struct timeval tv;
     FD_ZERO(&master_set);
-    FD_SET(sockfd,  &master_set);
-    /* Wait up to five seconds.  */
-    // tv.tv_sec = 5;
-    // tv.tv_usec = 0;
+    FD_SET(sockfd, &master_set);
 
-    int max_fd;
+    int max_fd = sockfd;
     int clientfd;
     char buff[128];
     int rcv_srvr;
@@ -76,42 +74,53 @@ int main(void) {
         // struct sockaddr_in peer_addr;
         // socklen_t peer_addr_size = sizeof(peer_addr);        
         fd_set read_set = master_set;
+        // printf("sock: %d, max: %d\n", sockfd, max_fd);
+        sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
+        // printf("test\n");
+        // printf("sel_val: %d\n", sel_val);
+        // printf("sock: %d, max: %d\n", sockfd, max_fd);
 
-        sel_val = select(max_fd+1, &read_set, NULL, NULL, NULL);
         if (sel_val < 0) {
             perror("select");
             continue;
         }
-        else if (sel_val) {
-            for (int i = 0; i <= max_fd; i++) {
-                if (FD_ISSET(i, &read_set) == 1) {
-                    if (i == sockfd) {
-                        clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
-                        if (clientfd < 0) {
-                            perror("accept");
-                            continue;
-                        }  
-                        if (clientfd > max_fd) max_fd = clientfd;   
-                        FD_SET(clientfd, &master_set);                
+        
+        for (int i = 0; i <= max_fd; i++) {
+            // printf("test2\n");
+            if (FD_ISSET(i, &read_set)) {
+                // printf("test3, i: %d\n", i);
+                if (i == sockfd) {     
+                    // printf("test4\n");                  
+                    clientfd = accept(sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
+                    if (clientfd < 0) {
+                        perror("accept");
+                        continue;
+                    }  
+                    if (clientfd > max_fd) max_fd = clientfd;   
+                    FD_SET(clientfd, &master_set);   
+                    printf("client: %d\n", clientfd);
+                    // exit(0);
+                }
+                else {
+                    rcv_srvr = recv(i, buff, 128, 0);
+                    // printf("recv: %d\n", rcv_srvr);
+                    if (rcv_srvr < 0) {
+                        perror("receive");
+                        continue;
+                    }
+                    else if (rcv_srvr > 0) {
+                        buff[rcv_srvr] = '\0';
+                        printf("msg: %s\n", buff);
                     }
                     else {
-                        rcv_srvr = recv(i, buff, 128, 0);
-                        if (rcv_srvr < 0) {
-                            perror("receive");
-                            continue;
-                        }
-                        else if (rcv_srvr > 0) {
-                            buff[rcv_srvr] = '\0';
-                            printf("msg: %s\n", buff);
-                        }
-                        else {
-                            FD_CLR(i, &master_set);
-                            close(i);
-                        }                        
-                    }
+                        FD_CLR(i, &master_set);
+                        close(i);
+                        printf("test\n");
+                    }                        
                 }
             }
         }
+     
 
         // struct sockaddr_in peer_addr;
         // socklen_t peer_addr_size = sizeof(peer_addr);
@@ -128,10 +137,10 @@ int main(void) {
         // buff[rcv_srvr] = '\0';
         // printf("msg: %s\n", buff);
 
-        if (close(clientfd) == -1) {
-            perror("close");
-            return -1;    
-        }
+        // if (close(clientfd) == -1) {
+        //     perror("close");
+        //     return -1;    
+        // }
     }
 
     close(sockfd);

@@ -29,7 +29,7 @@ int main(void) {
     
     char buff[128] = "hello, server!";
     int send_srvr = send(sockfd, buff, 15, 0);    
-    sleep(5);
-    // close(sockfd);
+    sleep(10);
+    close(sockfd);
     return 0;
 }
