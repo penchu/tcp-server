@@ -7,6 +7,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#define buff_size 128
+
+char *collecting_data(void);
+
 int main(void) {
     int sockfd;
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -25,12 +29,12 @@ int main(void) {
         perror("connect");
         close(sockfd);
         return -1;
-    }
+    }    
     
-    char buff[128] = "hello, server!";
+    char *buff = collecting_data();
     int send_srvr = send(sockfd, buff, 15, 0);  
 
-    char buff_rcv[128];
+    char buff_rcv[buff_size];
     int rcv_clnt = recv(sockfd, buff_rcv, 128, 0);
     buff_rcv[rcv_clnt] = '\0';
     printf("msg: %s\n", buff_rcv);
@@ -39,3 +43,17 @@ int main(void) {
     close(sockfd);
     return 0;
 }
+
+char *collecting_data(void) {
+    FILE *fptr;
+    fptr = fopen("/proc/sys/kernel/hostname", "r");
+    // size_t buff_size = 128;    
+    static char buff[buff_size];
+
+    fgets(buff, buff_size, fptr);
+    buff[strcspn(buff, "\n")] = '\0';
+    fclose(fptr);
+
+    // printf("%s\n", buff);
+    return buff;
+} 

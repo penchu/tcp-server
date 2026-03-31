@@ -6,8 +6,12 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <netinet/in.h>
+#include <time.h>
+#include <sqlite3.h>
 
 #define MAX_CLIENTS 10
+#define BUFF_SIZE 128
+#define BUFF_DB_SIZE 512
 
 int main(void) {
     int sockfd;
@@ -73,27 +77,37 @@ int main(void) {
                         continue;
                     }  
                     if (clientfd > max_fd) max_fd = clientfd;   
-                    FD_SET(clientfd, &master_set);   
-                    printf("client: %d\n", clientfd);
+                    FD_SET(clientfd, &master_set);  
                 }
                 else {
-                    rcv_srvr = recv(i, buff, 128, 0);
+                    rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
                     if (rcv_srvr < 0) {
                         perror("receive");
                         continue;
                     }
                     else if (rcv_srvr > 0) {
                         buff[rcv_srvr] = '\0';
-                        printf("msg: %s\n", buff);
 
-                        char buff_send[128] = "HELLO!";
-                        send(i, buff_send, 7, 0);
+                        sqlite3 *sql_db;
+                        sqlite3_open("monitoring.db", &sql_db);
+                        sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL); 
 
+                        char buff_send[BUFF_SIZE];                        
+                        time_t now = time(NULL);
+                        struct tm *t = localtime(&now);
+                        strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);     
+                        
+
+                        char buff_db[BUFF_DB_SIZE];
+                        snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
+                        sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+
+                        strncat(buff_send, ":log recorded", 13);
+                        send(i, buff_send, sizeof(buff_send), 0);
                     }
                     else {
                         FD_CLR(i, &master_set);
                         close(i);
-                        printf("test\n");
                     }                        
                 }
             }
