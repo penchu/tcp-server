@@ -13,6 +13,12 @@
 #define BUFF_SIZE 128
 #define BUFF_DB_SIZE 512
 
+typedef struct {
+    int cl_fd;
+    char buff[1024];
+    int position;
+} Clients;
+
 int main(void) {
     int sockfd;
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -58,6 +64,8 @@ int main(void) {
 
     struct sockaddr_in peer_addr;
     socklen_t peer_addr_size = sizeof(peer_addr);   
+
+    Clients client_list[MAX_CLIENTS];
     
     while (1) {        
         fd_set read_set = master_set;
@@ -95,14 +103,13 @@ int main(void) {
                         char buff_send[BUFF_SIZE];                        
                         time_t now = time(NULL);
                         struct tm *t = localtime(&now);
-                        strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);     
-                        
+                        strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);                           
 
                         char buff_db[BUFF_DB_SIZE];
                         snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
                         sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
-                        strncat(buff_send, ":log recorded", 13);
+                        strncat(buff_send, ":log recorded", 14);
                         send(i, buff_send, sizeof(buff_send), 0);
                     }
                     else {
