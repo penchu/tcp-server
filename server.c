@@ -19,6 +19,8 @@ typedef struct {
     int position;
 } Clients;
 
+int http_header(Clients client_list[MAX_CLIENTS]);
+
 int main(void) {
     int sockfd;
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -95,6 +97,15 @@ int main(void) {
                     }
                     else if (rcv_srvr > 0) {
                         buff[rcv_srvr] = '\0';
+                        
+                        int working_pos = client_list[i].position;
+                        memcpy(&client_list[i].buff[working_pos], &buff, rcv_srvr);
+                        client_list[i].position += rcv_srvr;
+
+                        if (strstr(client_list[i].buff, "\r\n\r\n") != NULL) {
+                            http_header(&client_list[i]);
+                        }
+
 
                         sqlite3 *sql_db;
                         sqlite3_open("monitoring.db", &sql_db);
@@ -123,5 +134,31 @@ int main(void) {
 
     close(sockfd);
     
+    return 0;
+}
+
+int http_header(Clients client_list[MAX_CLIENTS]) {
+    char *method;
+    char *path;
+    char *version;
+
+    char *p = client_list->buff;
+    method = p;
+
+    int i = 0;
+    while (*p != '\n') {
+        printf("%c\n", *p);
+        if (*p == ' ') {
+            *p = '\0';            
+            if (i == 0) {
+                path = p + 1;    
+                i++;        
+            }
+            else version = p + 1;          
+        }
+        p++;
+    }
+    // printf("method: %s, path: %s, version: %s\n", method, path, version);
+
     return 0;
 }
