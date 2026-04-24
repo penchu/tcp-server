@@ -22,6 +22,8 @@ typedef struct {
 int http_header(Clients client_list[MAX_CLIENTS]);
 int server_init(int *sockfd);
 int server_run(int *sockfd);
+int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set);
+int handle_client_data(Clients *client, char *buff, int *rcv_srvr);
 int db_store(char *buff);
 
 int main(void) {
@@ -169,12 +171,12 @@ int server_run(int *sockfd) {
     FD_SET(*sockfd, &master_set);
 
     int max_fd = *sockfd;
-    int clientfd;
+    // int clientfd;
     char buff[BUFF_SIZE];
     int rcv_srvr;    
 
-    struct sockaddr_in peer_addr;
-    socklen_t peer_addr_size = sizeof(peer_addr);   
+    // struct sockaddr_in peer_addr;
+    // socklen_t peer_addr_size = sizeof(peer_addr);   
 
     Clients client_list[MAX_CLIENTS];
 
@@ -183,7 +185,7 @@ int server_run(int *sockfd) {
     while (1) {        
         fd_set read_set = master_set;
         sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
-        printf("test\n");
+        // printf("test\n");
         if (sel_val < 0) {
             perror("select");
             continue;
@@ -192,13 +194,14 @@ int server_run(int *sockfd) {
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, &read_set)) {
                 if (i == *sockfd) {                 
-                    clientfd = accept(*sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
-                    if (clientfd < 0) {
-                        perror("accept");
-                        continue;
-                    }  
-                    if (clientfd > max_fd) max_fd = clientfd;   
-                    FD_SET(clientfd, &master_set);  
+                    // clientfd = accept(*sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
+                    // if (clientfd < 0) {
+                    //     perror("accept");
+                    //     continue;
+                    // }  
+                    // if (clientfd > max_fd) max_fd = clientfd;   
+                    // FD_SET(clientfd, &master_set);  
+                    handle_new_client(sockfd, &max_fd, &master_set);
                 }
                 else {
                     rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
@@ -209,13 +212,14 @@ int server_run(int *sockfd) {
                     else if (rcv_srvr > 0) {
                         buff[rcv_srvr] = '\0';
                         
-                        int working_pos = client_list[i].position;
-                        memcpy(&client_list[i].buff[working_pos], &buff, rcv_srvr);
-                        client_list[i].position += rcv_srvr;
-
-                        if (strstr(client_list[i].buff, "\r\n\r\n") != NULL) {
-                            http_header(&client_list[i]);
-                        }
+                        handle_client_data(&client_list[i], buff, &rcv_srvr);
+                        
+                        // int working_pos = client_list[i].position;
+                        // memcpy(&client_list[i].buff[working_pos], &buff, rcv_srvr);
+                        // client_list[i].position += rcv_srvr;
+                        // if (strstr(client_list[i].buff, "\r\n\r\n") != NULL) {
+                        //     http_header(&client_list[i]);
+                        // }
 
                         // sqlite3 *sql_db;
                         // sqlite3_open("monitoring.db", &sql_db);
@@ -227,11 +231,10 @@ int server_run(int *sockfd) {
                         // char buff_db[BUFF_DB_SIZE];
                         // snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
                         // sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
-                        
-                        char buff_send[BUFF_SIZE];
-
+                                              
                         db_store(buff);
 
+                        char buff_send[BUFF_SIZE];
                         strncat(buff_send, ":log recorded", 14);
                         send(i, buff_send, sizeof(buff_send), 0);
                     }
@@ -243,6 +246,32 @@ int server_run(int *sockfd) {
             }
         }     
     }
+    return 0;
+}
+
+int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
+    struct sockaddr_in peer_addr;
+    socklen_t peer_addr_size = sizeof(peer_addr); 
+
+    int clientfd = accept(*sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
+    if (clientfd < 0) {
+        perror("accept");
+        return -1;
+    }  
+    if (clientfd > *max_fd) *max_fd = clientfd;   
+    FD_SET(clientfd, master_set);  
+    return 0;
+}
+
+int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
+    int working_pos = client->position;
+    memcpy(&client->buff[working_pos], &buff, *rcv_srvr);
+    client->position += *rcv_srvr;
+
+    if (strstr(client->buff, "\r\n\r\n") != NULL) {
+        http_header(client);
+    }
+
     return 0;
 }
 
@@ -275,15 +304,15 @@ int db_store(char *buff) {
     sqlite3 *sql_db;
     sqlite3_open("monitoring.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL); 
-
+    
     char buff_send[BUFF_SIZE];                        
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);                           
-
+    
     char buff_db[BUFF_DB_SIZE];
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
-
+    
     return 0;
 }
