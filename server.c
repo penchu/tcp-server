@@ -19,12 +19,12 @@ typedef struct {
     int position;
 } Clients;
 
-int http_header(Clients client_list[MAX_CLIENTS]);
+int http_header(Clients *client);
 int server_init(int *sockfd);
 int server_run(int *sockfd);
 int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set);
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr);
-int db_store(char *buff);
+int db_store(char *buff, char *buff_send);
 
 int main(void) {
     int sockfd;
@@ -180,12 +180,13 @@ int server_run(int *sockfd) {
 
     Clients client_list[MAX_CLIENTS];
 
-    printf("sockfd: %ls, max_fd = %d\n", sockfd, max_fd);
+    // printf("sockfd: %d, max_fd = %d\n", sockfd, max_fd);
+    // printf("max_fd = %d\n", max_fd);
+    // printf("test\n");
     
     while (1) {        
         fd_set read_set = master_set;
         sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
-        // printf("test\n");
         if (sel_val < 0) {
             perror("select");
             continue;
@@ -193,7 +194,7 @@ int server_run(int *sockfd) {
         
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, &read_set)) {
-                if (i == *sockfd) {                 
+                if (i == *sockfd) {   
                     // clientfd = accept(*sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
                     // if (clientfd < 0) {
                     //     perror("accept");
@@ -211,9 +212,7 @@ int server_run(int *sockfd) {
                     }
                     else if (rcv_srvr > 0) {
                         buff[rcv_srvr] = '\0';
-                        
                         handle_client_data(&client_list[i], buff, &rcv_srvr);
-                        
                         // int working_pos = client_list[i].position;
                         // memcpy(&client_list[i].buff[working_pos], &buff, rcv_srvr);
                         // client_list[i].position += rcv_srvr;
@@ -232,11 +231,16 @@ int server_run(int *sockfd) {
                         // snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
                         // sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
                                               
-                        db_store(buff);
+                        // db_store(buff);
 
                         char buff_send[BUFF_SIZE];
+                        time_t now = time(NULL);
+                        struct tm *t = localtime(&now);
+                        strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);
                         strncat(buff_send, ":log recorded", 14);
                         send(i, buff_send, sizeof(buff_send), 0);
+
+                        db_store(buff, buff_send);
                     }
                     else {
                         FD_CLR(i, &master_set);
@@ -265,8 +269,11 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
     int working_pos = client->position;
+    
     memcpy(&client->buff[working_pos], &buff, *rcv_srvr);
     client->position += *rcv_srvr;
+    printf("pos: %d\n", client->position);
+    // printf("buff: %s, client_buff: %s\n", buff, client->buff);
 
     if (strstr(client->buff, "\r\n\r\n") != NULL) {
         http_header(client);
@@ -275,12 +282,14 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
     return 0;
 }
 
-int http_header(Clients client_list[MAX_CLIENTS]) {
+int http_header(Clients *client) {
+    printf("test_header\n");
     char *method;
     char *path;
     char *version;
 
-    char *p = client_list->buff;
+    // char *p = client_list->buff;
+    char *p = client->buff;
     method = p;
 
     int i = 0;
@@ -300,15 +309,15 @@ int http_header(Clients client_list[MAX_CLIENTS]) {
     return 0;
 }
 
-int db_store(char *buff) {
+int db_store(char *buff, char *buff_send) {
     sqlite3 *sql_db;
     sqlite3_open("monitoring.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL); 
     
-    char buff_send[BUFF_SIZE];                        
-    time_t now = time(NULL);
-    struct tm *t = localtime(&now);
-    strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);                           
+    // char buff_send[BUFF_SIZE];                        
+    // time_t now = time(NULL);
+    // struct tm *t = localtime(&now);
+    // strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);                           
     
     char buff_db[BUFF_DB_SIZE];
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
