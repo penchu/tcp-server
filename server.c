@@ -270,9 +270,9 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
     int working_pos = client->position;
     
-    memcpy(&client->buff[working_pos], &buff, *rcv_srvr);
+    memcpy(&client->buff[working_pos], buff, *rcv_srvr);
     client->position += *rcv_srvr;
-    printf("pos: %d\n", client->position);
+    // printf("pos: %d\n", client->position);
     // printf("buff: %s, client_buff: %s\n", buff, client->buff);
 
     if (strstr(client->buff, "\r\n\r\n") != NULL) {
@@ -283,7 +283,6 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 }
 
 int http_header(Clients *client) {
-    printf("test_header\n");
     char *method;
     char *path;
     char *version;
@@ -293,18 +292,22 @@ int http_header(Clients *client) {
     method = p;
 
     int i = 0;
-    while (*p != '\n') {
-        printf("%c\n", *p);
+    while (*p) {
+        // printf("%c\n", *p);
         if (*p == ' ') {
             *p = '\0';            
             if (i == 0) {
                 path = p + 1;    
                 i++;        
             }
-            else version = p + 1;          
+            else {
+                version = p + 1;   
+                break;    
+            }   
         }
         p++;
     }
+    version[strcspn(version, "\r")] = '\0';
     printf("method: %s, path: %s, version: %s\n", method, path, version);    
     return 0;
 }
