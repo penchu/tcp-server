@@ -29,7 +29,7 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr);
 int http_header_parse(Clients *client);
 int db_store(char *buff, char *buff_send);
 int handle_request(Clients *client);
-int handle_health();
+int handle_health(Clients *client);
 int handle_metrics();
 int handle_users();
 
@@ -37,7 +37,7 @@ int main(void) {
     int sockfd;
     
     server_init(&sockfd);
-    server_run(&sockfd);    
+    server_run(&sockfd);   
 
     close(sockfd);
     
@@ -112,14 +112,15 @@ int server_run(int *sockfd) {
                     }
                     else if (rcv_srvr > 0) {
                         buff[rcv_srvr] = '\0';
+                        client_list[i].cl_fd = i;
                         handle_client_data(&client_list[i], buff, &rcv_srvr);
-
+                
                         char buff_send[BUFF_SIZE];
                         time_t now = time(NULL);
                         struct tm *t = localtime(&now);
-                        strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);
-                        strncat(buff_send, ":log recorded", 14);
-                        send(i, buff_send, sizeof(buff_send), 0);
+                        // strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);
+                        // strncat(buff_send, ":log recorded", 14);
+                        // send(i, buff_send, sizeof(buff_send), 0);
 
                         db_store(buff, buff_send);
                     }
@@ -210,11 +211,11 @@ int db_store(char *buff, char *buff_send) {
 }
 
 int handle_request(Clients *client) {
-    printf("method: %s, path: %s, version: %s\n", client->method, client->path, client->version);
+    // printf("method: %s, path: %s, version: %s\n", client->method, client->path, client->version);
 
     if (strcmp("/health", client->path) == 0) {
-        handle_health();
-        printf("health\n");
+        handle_health(client);
+        // printf("health\n");
     }
     if (strcmp("/metrics", client->path) == 0) {
         handle_metrics();
@@ -228,7 +229,19 @@ int handle_request(Clients *client) {
     return 0;
 }
 
-int handle_health() {
+int handle_health(Clients *client) {
+    char buff_send[BUFF_SIZE];
+    int position;
+    position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Length: 19\r\n\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "{\"status\": \"ok\"}\r\n");
+
+    // buff_send[position] = '\0';
+    printf("%ld\n", strlen(buff_send));
+
+    send(client->cl_fd, buff_send, sizeof(buff_send), 0);
+
 
     return 0;
 }
