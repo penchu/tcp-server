@@ -234,13 +234,16 @@ int handle_health(Clients *client) {
     int position;
     position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Length: 19\r\n\r\n");
-    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "{\"status\": \"ok\"}\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Length: 17\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "{\"status\": \"ok\"}\n");
+
+    printf("pos: %d\n", position);
 
     // buff_send[position] = '\0';
     printf("%ld\n", strlen(buff_send));
 
-    send(client->cl_fd, buff_send, sizeof(buff_send), 0);
+    send(client->cl_fd, buff_send, position, 0);
 
 
     return 0;
