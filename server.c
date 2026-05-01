@@ -13,6 +13,8 @@
 #define BUFF_SIZE 128
 #define BUFF_DB_SIZE 512
 
+// time_t now;
+
 typedef struct {
     int cl_fd;
     char buff[1024];
@@ -22,6 +24,13 @@ typedef struct {
     char *version;
 } Clients;
 
+typedef struct {
+    time_t now;
+    int requests;
+} Server;
+
+Server server;
+
 int server_init(int *sockfd);
 int server_run(int *sockfd);
 int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set);
@@ -30,11 +39,12 @@ int http_header_parse(Clients *client);
 int db_store(char *buff, char *buff_send);
 int handle_request(Clients *client);
 int handle_health(Clients *client);
-int handle_metrics();
+int handle_metrics(Clients *client);
 int handle_users();
 
 int main(void) {
     int sockfd;
+    // Server server;
     
     server_init(&sockfd);
     server_run(&sockfd);   
@@ -45,7 +55,6 @@ int main(void) {
 }
 
 int server_init(int *sockfd) {
-    // int sockfd;
     if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket");
         return -1;
@@ -72,6 +81,14 @@ int server_init(int *sockfd) {
         perror("listen");
         return -1;
     }
+    
+    // char *buff_send;    
+    server.now = time(NULL);
+    // now = time(NULL);
+    // struct tm *t = localtime(&now); 
+    // strftime(buff_send, sizeof(buff_send), "%S", t);
+    // printf("time: %ld\n", now);
+    
     return 0;
 }
 
@@ -215,10 +232,9 @@ int handle_request(Clients *client) {
 
     if (strcmp("/health", client->path) == 0) {
         handle_health(client);
-        // printf("health\n");
     }
     if (strcmp("/metrics", client->path) == 0) {
-        handle_metrics();
+        handle_metrics(client);
         printf("metrics\n");
     }
     if (strcmp("/users", client->path) == 0) {
@@ -238,20 +254,19 @@ int handle_health(Clients *client) {
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "{\"status\": \"ok\"}\n");
 
-    printf("pos: %d\n", position);
-
-    // buff_send[position] = '\0';
-    printf("%ld\n", strlen(buff_send));
-
     send(client->cl_fd, buff_send, position, 0);
 
+    return 0;
+}
+
+int handle_metrics(Clients *client) {
+
+    time_t now_2 = time(NULL);
+    printf("uptime: %.2f seconds\n", difftime(now_2, server.now));
 
     return 0;
 }
-int handle_metrics() {
 
-    return 0;
-}
 int handle_users() {
 
     return 0;
