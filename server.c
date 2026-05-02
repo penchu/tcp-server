@@ -40,7 +40,7 @@ int db_store(char *buff, char *buff_send);
 int handle_request(Clients *client);
 int handle_health(Clients *client);
 int handle_metrics(Clients *client);
-int handle_users();
+int handle_users(Clients *client);
 
 int main(void) {
     int sockfd;
@@ -237,7 +237,7 @@ int handle_request(Clients *client) {
         handle_metrics(client);
     }
     if (strcmp("/users", client->path) == 0) {
-        handle_users();
+        handle_users(client);
         printf("users\n");
     }
 
@@ -282,7 +282,20 @@ int handle_metrics(Clients *client) {
     return 0;
 }
 
-int handle_users() {
+int handle_users(Clients *client) {
+    server.requests++;
+
+    char *buff;
+    
+    if (strcmp(client->method, "GET") == 0) {
+        buff = getenv("USER");
+        //will get back with users from the db
+    }
+    else if (strcmp(client->method, "POST") == 0) {
+        //will call the database func where a new user will be added - username, id and timestamp
+    }
+
+    printf("user: %s\n", buff);
 
     return 0;
 }
