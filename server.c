@@ -235,7 +235,6 @@ int handle_request(Clients *client) {
     }
     if (strcmp("/metrics", client->path) == 0) {
         handle_metrics(client);
-        printf("metrics\n");
     }
     if (strcmp("/users", client->path) == 0) {
         handle_users();
@@ -246,6 +245,7 @@ int handle_request(Clients *client) {
 }
 
 int handle_health(Clients *client) {
+    server.requests++;
     char buff_send[BUFF_SIZE];
     int position;
     position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
@@ -260,10 +260,25 @@ int handle_health(Clients *client) {
 }
 
 int handle_metrics(Clients *client) {
-
+    server.requests++;
     time_t now_2 = time(NULL);
-    printf("uptime: %.2f seconds\n", difftime(now_2, server.now));
+    int time_diff = difftime(now_2, server.now);
 
+    char response_body[BUFF_SIZE];
+    char buff_send[BUFF_SIZE];
+    int position;
+    int pos_body;
+
+    pos_body = sprintf(response_body, "{\"uptime\": %d, \"requests\": %d}", time_diff, server.requests);   
+
+    position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", pos_body+1);
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s\n", response_body);
+
+    send(client->cl_fd, buff_send, position, 0);
+   
     return 0;
 }
 
