@@ -41,6 +41,7 @@ int handle_request(Clients *client);
 int handle_health(Clients *client);
 int handle_metrics(Clients *client);
 int handle_users(Clients *client);
+int db_users(sqlite3 *sql_db);
 
 int main(void) {
     int sockfd;
@@ -285,17 +286,30 @@ int handle_metrics(Clients *client) {
 int handle_users(Clients *client) {
     server.requests++;
 
-    char *buff;
-    
+    sqlite3 *sql_db;
+    sqlite3_open("monit_users.db", &sql_db);
+    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, timestamp TEXT)", 
+                NULL, NULL, NULL);  
+
+
+    char *buff;    
     if (strcmp(client->method, "GET") == 0) {
         buff = getenv("USER");
         //will get back with users from the db
     }
     else if (strcmp(client->method, "POST") == 0) {
         //will call the database func where a new user will be added - username, id and timestamp
+        db_users(sql_db);
     }
 
     printf("user: %s\n", buff);
+
+    return 0;
+}
+
+int db_users(sqlite3 *sql_db) {
+
+    // should proceed with exec() and probably INSERT INTO metrics with passing what is needed
 
     return 0;
 }
