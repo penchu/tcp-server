@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <time.h>
 #include <sqlite3.h>
+#include <uuid/uuid.h>
 
 #define MAX_CLIENTS 10
 #define BUFF_SIZE 128
@@ -42,7 +43,7 @@ int handle_request(Clients *client);
 int handle_health(Clients *client);
 int handle_metrics(Clients *client);
 int handle_users(Clients *client);
-int db_users(sqlite3 *sql_db);
+int db_users(sqlite3 *sql_db, Clients *client);
 
 int main(void) {
     int sockfd;
@@ -192,11 +193,16 @@ int http_header_parse(Clients *client) {
         length = strchr(length, ':') + 1;
     }    
     cont_len = strtoul(length, &endptr, 0);
-    // printf("length is: %d\n", cont_len);
 
     char *body_str = strstr(client->buff, "\r\n\r\n");
     client->body = body_str + 4;
-    client->body[cont_len] = '\0';
+
+    if (strstr(client->buff, "application/json")) {
+        client->body = strchr(client->body, ':') + 2;
+        *(strchr(client->body + 1, '"')) = '\0';
+    }
+
+    // client->body[cont_len] = '\0';
 
     char *p = client->buff;
     client->method = p;
@@ -252,7 +258,6 @@ int handle_request(Clients *client) {
     }
     if (strcmp("/users", client->path) == 0) {
         handle_users(client);
-        printf("users\n");
     }
 
     return 0;
@@ -303,29 +308,35 @@ int handle_users(Clients *client) {
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, timestamp TEXT)", NULL, NULL, NULL);  
 
-    char *buff;    
+    char buff[BUFF_SIZE];    
     if (strcmp(client->method, "GET") == 0) {
-        buff = getenv("USER");
+        strcpy(buff, getenv("USER"));
+        // buff = getenv("USER");
         //will get back with users from the db
     }
     else if (strcmp(client->method, "POST") == 0) {
         //will call the database func where a new user will be added - username, id and timestamp
-        // printf("test_users\n");
-        db_users(sql_db);
+        db_users(sql_db, client);
     }
-
-    // printf("user: %s\n", buff);
 
     return 0;
 }
 
-int db_users(sqlite3 *sql_db) {
-    printf("test_db_users\n");
-    // should proceed with exec() and probably INSERT INTO metrics with passing what is needed
+int db_users(sqlite3 *sql_db, Clients *client) {
+    uuid_t user_id;
+    uuid_generate(user_id);
+    char out[37];
+    uuid_unparse(user_id, out);
+    
+    char buff_time[BUFF_SIZE];
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
-    // char buff_db[BUFF_DB_SIZE];
-    // snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
-    // sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+    char buff_db[BUFF_DB_SIZE];
+    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, timestamp) VALUES ('%s', '%s', '%s')", 
+            out, client->body, buff_time);
+    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     return 0;
 }
