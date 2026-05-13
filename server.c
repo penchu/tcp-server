@@ -188,15 +188,15 @@ int http_header_parse(Clients *client) {
     int cont_len;
     char *length;
     char *endptr;
-    length = strstr(client->buff, "Content-Length: ");
-    length += 16;
+    if ((length = strstr(client->buff, "Content-Length")) != NULL) {        
+        length = strchr(length, ':') + 1;
+    }    
     cont_len = strtoul(length, &endptr, 0);
-    printf("length is: %d\n", cont_len);
+    // printf("length is: %d\n", cont_len);
 
     char *body_str = strstr(client->buff, "\r\n\r\n");
     client->body = body_str + 4;
-    char *end_body = client->body + cont_len;
-    *end_body = '\0';
+    client->body[cont_len] = '\0';
 
     char *p = client->buff;
     client->method = p;
@@ -242,7 +242,7 @@ int db_store(char *buff, char *buff_send) {
 }
 
 int handle_request(Clients *client) {
-    printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
+    // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
 
     if (strcmp("/health", client->path) == 0) {
         handle_health(client);
@@ -310,11 +310,11 @@ int handle_users(Clients *client) {
     }
     else if (strcmp(client->method, "POST") == 0) {
         //will call the database func where a new user will be added - username, id and timestamp
-        printf("test_users\n");
+        // printf("test_users\n");
         db_users(sql_db);
     }
 
-    printf("user: %s\n", buff);
+    // printf("user: %s\n", buff);
 
     return 0;
 }
