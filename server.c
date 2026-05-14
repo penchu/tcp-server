@@ -187,14 +187,13 @@ int http_header_parse(Clients *client) {
     char *path;
     char *version;
     
-    // int cont_len;
+    int cont_len;
     char *length;
     char *endptr;
     if ((length = strstr(client->buff, "Content-Length")) != NULL) {        
         length = strchr(length, ':') + 1;
     }  
-
-    // cont_len = strtoul(length, &endptr, 0);
+    if (length) strtoul(length, &endptr, 0);
     
     char *body_str = strstr(client->buff, "\r\n\r\n");
     client->body = body_str + 4;
