@@ -186,15 +186,16 @@ int http_header_parse(Clients *client) {
     char *method;
     char *path;
     char *version;
-
-    int cont_len;
+    
+    // int cont_len;
     char *length;
     char *endptr;
     if ((length = strstr(client->buff, "Content-Length")) != NULL) {        
         length = strchr(length, ':') + 1;
-    }    
-    cont_len = strtoul(length, &endptr, 0);
+    }  
 
+    // cont_len = strtoul(length, &endptr, 0);
+    
     char *body_str = strstr(client->buff, "\r\n\r\n");
     client->body = body_str + 4;
 
@@ -203,7 +204,7 @@ int http_header_parse(Clients *client) {
         *(strchr(client->body + 1, '"')) = '\0';
     }
 
-    // client->body[cont_len] = '\0';
+    // client->body[cont_len] = '\0';    
 
     char *p = client->buff;
     client->method = p;
@@ -250,7 +251,6 @@ int db_store(char *buff, char *buff_send) {
 
 int handle_request(Clients *client) {
     // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
-
     if (strcmp("/health", client->path) == 0) {
         handle_health(client);
     }
