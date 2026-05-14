@@ -44,6 +44,7 @@ int handle_health(Clients *client);
 int handle_metrics(Clients *client);
 int handle_users(Clients *client);
 int db_users(sqlite3 *sql_db, Clients *client);
+int callback_func(void *buff, int num_columns, char** values, char** col_names);
 
 int main(void) {
     int sockfd;
@@ -310,12 +311,11 @@ int handle_users(Clients *client) {
 
     char buff[BUFF_SIZE];    
     if (strcmp(client->method, "GET") == 0) {
-        strcpy(buff, getenv("USER"));
-        // buff = getenv("USER");
-        //will get back with users from the db
+
+        sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, buff, NULL);
+
     }
     else if (strcmp(client->method, "POST") == 0) {
-        //will call the database func where a new user will be added - username, id and timestamp
         db_users(sql_db, client);
     }
 
@@ -338,5 +338,10 @@ int db_users(sqlite3 *sql_db, Clients *client) {
             out, client->body, buff_time);
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
+    return 0;
+}
+
+int callback_func(void *buff, int num_columns, char** values, char** col_names) {
+    printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
     return 0;
 }
