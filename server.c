@@ -31,6 +31,11 @@ typedef struct {
     int requests;
 } Server;
 
+typedef struct {
+    int position;
+    char buff[1024];
+} Callback;
+
 Server server;
 
 int server_init(int *sockfd);
@@ -44,7 +49,7 @@ int handle_health(Clients *client);
 int handle_metrics(Clients *client);
 int handle_users(Clients *client);
 int db_users(sqlite3 *sql_db, Clients *client);
-int callback_func(void *buff, int num_columns, char** values, char** col_names);
+int callback_func(void *callback_data, int num_columns, char** values, char** col_names);
 
 int main(void) {
     int sockfd;
@@ -308,11 +313,11 @@ int handle_users(Clients *client) {
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, timestamp TEXT)", NULL, NULL, NULL);  
 
-    char buff[BUFF_SIZE];    
+    // char buff[BUFF_SIZE]; 
+    Callback callback_struct;   
     if (strcmp(client->method, "GET") == 0) {
-
-        sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, buff, NULL);
-
+        sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)&callback_struct, NULL);
+        printf("%s", callback_struct.buff);
     }
     else if (strcmp(client->method, "POST") == 0) {
         db_users(sql_db, client);
@@ -340,7 +345,13 @@ int db_users(sqlite3 *sql_db, Clients *client) {
     return 0;
 }
 
-int callback_func(void *buff, int num_columns, char** values, char** col_names) {
-    printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
+int callback_func(void *callback_data, int num_columns, char** values, char** col_names) {
+    // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
+
+    Callback *callback_struct = (Callback *)callback_data;
+    callback_struct->position += snprintf(callback_struct->buff + callback_struct->position, sizeof(callback_struct->buff), 
+                                "%s, %s, %s\n", values[0], values[1], values[2]);
+  
+
     return 0;
 }
