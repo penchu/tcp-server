@@ -33,7 +33,7 @@ typedef struct {
 
 typedef struct {
     int position;
-    char buff[2048];
+    char buff[4096];
 } Callback;
 
 Server server;
@@ -319,9 +319,13 @@ int handle_users(Clients *client) {
     callback_struct.position++; 
     if (strcmp(client->method, "GET") == 0) {
         sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)&callback_struct, NULL);
-        // callback_struct.buff[callback_struct.position - 1] = ']';
-        // callback_struct.buff[callback_struct.position] = '\0';
-        printf("%s", callback_struct.buff);
+        
+        callback_struct.buff[callback_struct.position-2] = ']'; 
+        callback_struct.buff[callback_struct.position-1] = '\0';        
+
+        // printf("%s\n", callback_struct.buff);
+        printf("%s", callback_struct.buff);        
+  
     }
     else if (strcmp(client->method, "POST") == 0) {
         db_users(sql_db, client);
@@ -356,7 +360,11 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     callback_struct->position += snprintf(callback_struct->buff + callback_struct->position, sizeof(callback_struct->buff), 
                                 "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
                                 values[0], values[1], values[2]);
-  
+
+    // printf("buf ptr = %p\n", (void*)callback_struct->buff);
+    
+    // printf("%d\n", callback_struct->position);
+    // printf("%ld\n", strlen(callback_struct->buff));
 
     return 0;
 }
