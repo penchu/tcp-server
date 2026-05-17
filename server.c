@@ -50,6 +50,7 @@ int handle_metrics(Clients *client);
 int handle_users(Clients *client);
 int db_users(sqlite3 *sql_db, Clients *client);
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names);
+int GET_response(Callback *s, Clients *client);
 
 int main(void) {
     int sockfd;
@@ -324,7 +325,7 @@ int handle_users(Clients *client) {
         callback_struct.buff[callback_struct.position-1] = '\0';        
 
         // printf("%s\n", callback_struct.buff);
-        printf("%s", callback_struct.buff);        
+        GET_response(&callback_struct, client);
   
     }
     else if (strcmp(client->method, "POST") == 0) {
@@ -359,12 +360,24 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     Callback *callback_struct = (Callback *)callback_data;
     callback_struct->position += snprintf(callback_struct->buff + callback_struct->position, sizeof(callback_struct->buff), 
                                 "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
-                                values[0], values[1], values[2]);
-
-    // printf("buf ptr = %p\n", (void*)callback_struct->buff);
-    
-    // printf("%d\n", callback_struct->position);
-    // printf("%ld\n", strlen(callback_struct->buff));
+                                values[0], values[1], values[2]);  
 
     return 0;
 }
+
+int GET_response(Callback *s, Clients *client) {
+    
+    int position;
+    char buff_send[BUFF_SIZE*20];
+    position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", s->position+1);
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s\n", s->buff);
+
+    // printf("%s\n", buff_send);
+    send(client->cl_fd, buff_send, position, 0);    
+
+    return 0;    
+}
+
