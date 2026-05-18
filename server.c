@@ -289,13 +289,13 @@ int handle_metrics(Clients *client) {
     int position;
     int pos_body;
 
-    pos_body = sprintf(response_body, "{\"uptime\": %d, \"requests\": %d}", time_diff, server.requests);   
+    pos_body = sprintf(response_body, "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);   
 
     position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", pos_body+1);
+    position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", pos_body);
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    position += snprintf(buff_send + position, sizeof(buff_send), "%s\n", response_body);
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", response_body);
 
     send(client->cl_fd, buff_send, position, 0);
    
@@ -316,8 +316,7 @@ int handle_users(Clients *client) {
     if (strcmp(client->method, "GET") == 0) {
         sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)&callback_struct, NULL);
         
-        callback_struct.buff[callback_struct.position-2] = ']'; 
-        callback_struct.buff[callback_struct.position-1] = '\0';        
+        callback_struct.buff[callback_struct.position-2] = ']';       
 
         // printf("%s\n", callback_struct.buff);
         GET_response(&callback_struct, client);
@@ -366,9 +365,9 @@ int GET_response(Callback *s, Clients *client) {
     char buff_send[BUFF_SIZE*20];
     position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", s->position+1);
+    position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", s->position);
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    position += snprintf(buff_send + position, sizeof(buff_send), "%s\n", s->buff);
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", s->buff);
 
     send(client->cl_fd, buff_send, position, 0);    
 
