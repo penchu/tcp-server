@@ -90,13 +90,8 @@ int server_init(int *sockfd) {
         perror("listen");
         return -1;
     }
-    
-    // char *buff_send;    
+       
     server.now = time(NULL);
-    // now = time(NULL);
-    // struct tm *t = localtime(&now); 
-    // strftime(buff_send, sizeof(buff_send), "%S", t);
-    // printf("time: %ld\n", now);
     
     return 0;
 }
@@ -127,10 +122,10 @@ int server_run(int *sockfd) {
         
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, &read_set)) {
-                if (i == *sockfd) {   
+                if (i == *sockfd) {  
                     handle_new_client(sockfd, &max_fd, &master_set);
                 }
-                else {
+                else {                    
                     rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
                     if (rcv_srvr < 0) {
                         perror("receive");
@@ -141,17 +136,17 @@ int server_run(int *sockfd) {
                         client_list[i].cl_fd = i;
                         handle_client_data(&client_list[i], buff, &rcv_srvr);
                 
-                        char buff_send[BUFF_SIZE];
-                        time_t now = time(NULL);
-                        struct tm *t = localtime(&now);
+                        // char buff_send[BUFF_SIZE];
+                        // time_t now = time(NULL);
+                        // struct tm *t = localtime(&now);
                         // strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);
                         // strncat(buff_send, ":log recorded", 14);
                         // send(i, buff_send, sizeof(buff_send), 0);
-
-                        db_store(buff, buff_send);
+                        // db_store(buff, buff_send);
                     }
                     else {
                         FD_CLR(i, &master_set);
+                        memset(&client_list[i], 0, sizeof(Clients));
                         close(i);
                     }                        
                 }
@@ -171,7 +166,7 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
         return -1;
     }  
     if (clientfd > *max_fd) *max_fd = clientfd;   
-    FD_SET(clientfd, master_set);  
+    FD_SET(clientfd, master_set); 
     return 0;
 }
 
@@ -375,7 +370,6 @@ int GET_response(Callback *s, Clients *client) {
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s\n", s->buff);
 
-    // printf("%s\n", buff_send);
     send(client->cl_fd, buff_send, position, 0);    
 
     return 0;    
