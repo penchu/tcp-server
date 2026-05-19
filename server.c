@@ -243,6 +243,7 @@ int db_store(char *buff, char *buff_send) {
     // strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);                           
     
     char buff_db[BUFF_DB_SIZE];
+    memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
     
@@ -267,6 +268,7 @@ int handle_request(Clients *client) {
 int handle_health(Clients *client) {
     server.requests++;
     char buff_send[BUFF_SIZE];
+    memset(buff_send, 0, sizeof(buff_send));
     int position;
     position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
@@ -275,7 +277,7 @@ int handle_health(Clients *client) {
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "{\"status\": \"ok\"}\n");
 
     send(client->cl_fd, buff_send, position, 0);
-    memset(buff_send, 0, sizeof(buff_send));
+    // memset(buff_send, 0, sizeof(buff_send));
 
     return 0;
 }
@@ -286,7 +288,9 @@ int handle_metrics(Clients *client) {
     int time_diff = difftime(now_2, server.now);
 
     char response_body[BUFF_SIZE];
+    memset(response_body, 0, sizeof(response_body));
     char buff_send[BUFF_SIZE];
+    memset(buff_send, 0, sizeof(buff_send));
     int position;
     int pos_body;
 
@@ -299,7 +303,7 @@ int handle_metrics(Clients *client) {
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", response_body);
 
     send(client->cl_fd, buff_send, position, 0);
-    memset(buff_send, 0, sizeof(buff_send));
+    // memset(buff_send, 0, sizeof(buff_send));
    
     return 0;
 }
@@ -339,20 +343,24 @@ int db_users(sqlite3 *sql_db, Clients *client) {
     uuid_unparse(user_id, out);
     
     char buff_time[BUFF_SIZE];
+    memset(buff_time, 0, sizeof(buff_time));
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
     char buff_db[BUFF_DB_SIZE];
+    memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, timestamp) VALUES ('%s', '%s', '%s')", 
             out, client->body, buff_time);
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     char send_body[BUFF_SIZE*2];
+    memset(send_body, 0, sizeof(send_body));
     int pos_body = snprintf(send_body, sizeof(send_body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"}\n",
                     out, client->body, buff_time);
 
     char buff_send[BUFF_SIZE*20];
+    memset(buff_send, 0, sizeof(buff_send));
     int position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 201 Created\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", pos_body);
@@ -361,7 +369,7 @@ int db_users(sqlite3 *sql_db, Clients *client) {
     send(client->cl_fd, buff_send, position, 0);
 
     // buff_send[0] = '\0';
-    memset(buff_send, 0, sizeof(buff_send));
+    // memset(buff_send, 0, sizeof(buff_send));
 
     // POST_response(client);
 
@@ -383,6 +391,7 @@ int GET_response(Callback *s, Clients *client) {
     
     int position;
     char buff_send[BUFF_SIZE*20];
+    memset(buff_send, 0, sizeof(buff_send));
     position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
     position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", s->position);
@@ -391,7 +400,7 @@ int GET_response(Callback *s, Clients *client) {
 
     send(client->cl_fd, buff_send, position, 0);   
     
-    memset(buff_send, 0, sizeof(buff_send));
+    // memset(buff_send, 0, sizeof(buff_send));
     // memset(s, 0, sizeof(Callback));
 
     return 0;    
