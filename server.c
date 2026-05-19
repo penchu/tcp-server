@@ -51,6 +51,7 @@ int handle_users(Clients *client);
 int db_users(sqlite3 *sql_db, Clients *client);
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names);
 int GET_response(Callback *s, Clients *client);
+int DEL_users(sqlite3 *sql_db, Clients *client);
 
 int main(void) {
     int sockfd;
@@ -187,6 +188,8 @@ int http_header_parse(Clients *client) {
     char *method;
     char *path;
     char *version;
+
+    printf("%s\n", client->buff);
     
     int cont_len;
     char *length;
@@ -255,10 +258,10 @@ int handle_request(Clients *client) {
     if (strcmp("/health", client->path) == 0) {
         handle_health(client);
     }
-    if (strcmp("/metrics", client->path) == 0) {
+    else if (strcmp("/metrics", client->path) == 0) {
         handle_metrics(client);
     }
-    if (strcmp("/users", client->path) == 0) {
+    else if (strcmp("/users", client->path) == 0) {
         handle_users(client);
     }
 
@@ -331,6 +334,9 @@ int handle_users(Clients *client) {
     }
     else if (strcmp(client->method, "POST") == 0) {
         db_users(sql_db, client);
+    }
+    else if (strcmp(client->method, "DELETE") == 0) {
+        DEL_users(sql_db, client);
     }
 
     return 0;
@@ -405,5 +411,12 @@ int GET_response(Callback *s, Clients *client) {
 
     return 0;    
 }
+
+int DEL_users(sqlite3 *sql_db, Clients *client) {
+
+
+
+    return 0;
+} 
 
 
