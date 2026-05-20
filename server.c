@@ -189,7 +189,7 @@ int http_header_parse(Clients *client) {
     char *path;
     char *version;
 
-    printf("%s\n", client->buff);
+    // printf("%s\n", client->buff);
     
     int cont_len;
     char *length;
@@ -255,13 +255,14 @@ int db_store(char *buff, char *buff_send) {
 
 int handle_request(Clients *client) {
     // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
+    
     if (strcmp("/health", client->path) == 0) {
         handle_health(client);
     }
     else if (strcmp("/metrics", client->path) == 0) {
         handle_metrics(client);
     }
-    else if (strcmp("/users", client->path) == 0) {
+    else if (strstr(client->path, "/users") != NULL) {
         handle_users(client);
     }
 
@@ -412,9 +413,21 @@ int GET_response(Callback *s, Clients *client) {
     return 0;    
 }
 
-int DEL_users(sqlite3 *sql_db, Clients *client) {
+int DEL_users(sqlite3 *sql_db, Clients *client) {    
+    
+    char *uuid = strrchr(client->path, '/') + 1;
 
+    char buff_db[BUFF_DB_SIZE];
+    memset(buff_db, 0, sizeof(buff_db));
+    snprintf(buff_db, sizeof(buff_db), "DELETE FROM users WHERE UUID='%s'", uuid);
+    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
+    char buff_send[BUFF_SIZE];
+    memset(buff_send, 0, sizeof(buff_send));
+    int position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 204 No Content\r\n");
+    position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
+
+    send(client->cl_fd, buff_send, position, 0);
 
     return 0;
 } 
