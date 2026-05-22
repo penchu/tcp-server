@@ -152,6 +152,7 @@ int server_run(int *sockfd) {
                         // db_store(buff, buff_send);
                     }
                     else {
+                        // printf("fd clr\n");
                         FD_CLR(i, &master_set);
                         memset(&client_list[i], 0, sizeof(Clients));
                         close(i);
@@ -402,8 +403,14 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, sizeof(buff_db), "DELETE FROM users WHERE UUID='%s'", uuid);
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+    
 
-    snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
+    if (sqlite3_changes(sql_db) == 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
+    }
+    else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
 
     return 0;
 } 
