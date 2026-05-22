@@ -294,23 +294,9 @@ int handle_request(Clients *client) {
 int handle_health(Clients *client, Response *r) {
     server.requests++;
 
-    // strcpy(r->status_code, "200 OK");
-    // strcpy(r->type, "application/json");
-    // strcpy(r->body, "{\"status\": \"ok\"}\n"); 
-
     snprintf(r->body, sizeof(r->body), "%s", "{\"status\": \"ok\"}\n");
     snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
     snprintf(r->type, sizeof(r->type), "%s", "application/json");
-
-    // char buff_send[BUFF_SIZE];
-    // memset(buff_send, 0, sizeof(buff_send));
-    // int position;
-    // position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Length: 17\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "{\"status\": \"ok\"}\n");
-    // send(client->cl_fd, buff_send, position, 0);
 
     return 0;
 }
@@ -320,23 +306,9 @@ int handle_metrics(Clients *client, Response *r) {
     time_t now_2 = time(NULL);
     int time_diff = difftime(now_2, server.now);
 
-    // char response_body[BUFF_SIZE];
-    // memset(response_body, 0, sizeof(response_body));
-    // char buff_send[BUFF_SIZE];
-    // memset(buff_send, 0, sizeof(buff_send));
-    // int position;
-    // int pos_body;
-
     snprintf(r->body, sizeof(r->body), "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
     snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
     snprintf(r->type, sizeof(r->type), "%s", "application/json");
-
-    // position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", pos_body);
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", response_body);
-    // send(client->cl_fd, buff_send, position, 0);
 
     return 0;
 }
@@ -348,15 +320,17 @@ int handle_users(Clients *client, Response *r) {
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, timestamp TEXT)", NULL, NULL, NULL);  
 
-    // char buff[BUFF_SIZE]; 
     Callback callback_struct;  
     memset(&callback_struct, 0, sizeof(Callback));
-    callback_struct.buff[0] = '[';
-    callback_struct.position++; 
+    // callback_struct.buff[0] = '[';
+    // callback_struct.position++;     
     if (strcmp(client->method, "GET") == 0) {
-        sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)&callback_struct, NULL);
+        r->body[0] = '[';
+        sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
         
-        callback_struct.buff[callback_struct.position-2] = ']';       
+        // callback_struct.buff[callback_struct.position-2] = ']';       
+        r->body[strlen(r->body)-2] = ']';
+        // printf("%s\n", r->body);
 
         GET_response(&callback_struct, client, r);
   
@@ -394,31 +368,19 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"}\n", 
             out, client->body, buff_time);
 
-    // char send_body[BUFF_SIZE*2];
-    // memset(send_body, 0, sizeof(send_body));
-    // int pos_body = snprintf(send_body, sizeof(send_body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"}\n",
-    //                 out, client->body, buff_time);
-
-    // char buff_send[BUFF_SIZE*20];
-    // memset(buff_send, 0, sizeof(buff_send));
-    // int position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 201 Created\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", pos_body);
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", send_body);
-    // send(client->cl_fd, buff_send, position, 0);
-
-
     return 0;
 }
 
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names) {
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
 
-    Callback *callback_struct = (Callback *)callback_data;
-    callback_struct->position += snprintf(callback_struct->buff + callback_struct->position, sizeof(callback_struct->buff), 
-                                "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
-                                values[0], values[1], values[2]);  
+    // Callback *callback_struct = (Callback *)callback_data;
+    Response *r = (Response *)callback_data;
+    snprintf(r->body + strlen(r->body), sizeof(r->body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
+             values[0], values[1], values[2]);
+    // callback_struct->position += snprintf(callback_struct->buff + callback_struct->position, sizeof(callback_struct->buff), 
+    //                             "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
+    //                             values[0], values[1], values[2]);  
 
     return 0;
 }
@@ -427,20 +389,7 @@ int GET_response(Callback *s, Clients *client, Response *r) {
     
     snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
     snprintf(r->type, sizeof(r->type), "%s", "application/json");  
-    snprintf(r->body, sizeof(r->body), "%s", s->buff);  
-    
-    // int position;
-    // char buff_send[BUFF_SIZE*20];
-    // memset(buff_send, 0, sizeof(buff_send));
-    // position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 200 OK\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "Content-Type: application/json\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", s->position);
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", s->buff);
-    // send(client->cl_fd, buff_send, position, 0);   
-    
-    // memset(buff_send, 0, sizeof(buff_send));
-    // memset(s, 0, sizeof(Callback));
+    // snprintf(r->body, sizeof(r->body), "%s", s->buff);  
 
     return 0;    
 }
@@ -455,14 +404,6 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
-    // snprintf(r->type, sizeof(r->type), "%s", "");  
-    // snprintf(r->body, sizeof(r->body), "%s", "");  
-
-    // char buff_send[BUFF_SIZE];
-    // memset(buff_send, 0, sizeof(buff_send));
-    // int position = snprintf(buff_send, sizeof(buff_send), "%s", "HTTP/1.1 204 No Content\r\n");
-    // position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    // send(client->cl_fd, buff_send, position, 0);
 
     return 0;
 } 
