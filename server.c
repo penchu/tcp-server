@@ -56,8 +56,9 @@ int handle_metrics(Clients *client, Response *r);
 int handle_users(Clients *client, Response *r);
 int db_users(sqlite3 *sql_db, Clients *client, Response *r);
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names);
-int GET_response(Callback *s, Clients *client, Response *r);
+int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
+int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
 
 int main(void) {
     int sockfd;
@@ -212,9 +213,7 @@ int http_header_parse(Clients *client) {
     if (strstr(client->buff, "application/json")) {
         client->body = strchr(client->body, ':') + 2;
         *(strchr(client->body + 1, '"')) = '\0';
-    }
-
-    // client->body[cont_len] = '\0';    
+    }  
 
     char *p = client->buff;
     client->method = p;
@@ -320,20 +319,13 @@ int handle_users(Clients *client, Response *r) {
     sqlite3 *sql_db;
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, timestamp TEXT)", NULL, NULL, NULL);  
-
-    Callback callback_struct;  
-    memset(&callback_struct, 0, sizeof(Callback));
-    // callback_struct.buff[0] = '[';
-    // callback_struct.position++;     
+ 
     if (strcmp(client->method, "GET") == 0) {
         r->body[0] = '[';
         sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        
-        // callback_struct.buff[callback_struct.position-2] = ']';       
         r->body[strlen(r->body)-2] = ']';
-        // printf("%s\n", r->body);
 
-        GET_response(&callback_struct, client, r);
+        GET_response(client, r);
   
     }
     else if (strcmp(client->method, "POST") == 0) {
@@ -341,6 +333,9 @@ int handle_users(Clients *client, Response *r) {
     }
     else if (strcmp(client->method, "DELETE") == 0) {
         DEL_users(sql_db, client, r);
+    }
+    else if (strcmp(client->method, "PUT") == 0) {
+        UPDATE_users(sql_db, client, r);
     }
 
     return 0;
@@ -386,11 +381,10 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     return 0;
 }
 
-int GET_response(Callback *s, Clients *client, Response *r) {    
+int GET_response(Clients *client, Response *r) {    
     
     snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
     snprintf(r->type, sizeof(r->type), "%s", "application/json");  
-    // snprintf(r->body, sizeof(r->body), "%s", s->buff);  
 
     return 0;    
 }
@@ -414,6 +408,25 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     return 0;
 } 
+
+int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
+
+    char *uuid = strrchr(client->path, '/') + 1;
+
+    char buff_db[BUFF_DB_SIZE];
+    memset(buff_db, 0, sizeof(buff_db));
+    snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->body, uuid);     
+    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+
+    if (sqlite3_changes(sql_db) == 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
+    }
+    else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
+
+    return 0;
+}
 
 
 
