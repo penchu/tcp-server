@@ -9,6 +9,7 @@
 #include <time.h>
 #include <sqlite3.h>
 #include <uuid/uuid.h>
+#include <sodium.h>
 
 #define MAX_CLIENTS 10
 #define BUFF_SIZE 128
@@ -193,9 +194,9 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 }
 
 int http_header_parse(Clients *client) {
-    char *method;
-    char *path;
-    char *version;
+    // char *method;
+    // char *path;
+    // char *version;
 
     // printf("%s\n", client->buff);
     
@@ -210,10 +211,14 @@ int http_header_parse(Clients *client) {
     char *body_str = strstr(client->buff, "\r\n\r\n");
     client->body = body_str + 4;
 
-    if (strstr(client->buff, "application/json")) {
-        client->body = strchr(client->body, ':') + 2;
-        *(strchr(client->body + 1, '"')) = '\0';
-    }  
+    // printf("%s\n", client->buff);
+    // if (strstr(client->buff, "application/json")) {
+    //     client->body = strchr(client->body, ':') + 2;
+    //     *(strchr(client->body + 1, '"')) = '\0';
+    // }  
+    // printf("%s\n", client->buff);
+    // printf("%s\n", client->body);
+    // exit(0);
 
     char *p = client->buff;
     client->method = p;
@@ -318,7 +323,8 @@ int handle_users(Clients *client, Response *r) {
 
     sqlite3 *sql_db;
     sqlite3_open("monit_users.db", &sql_db);
-    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, timestamp TEXT)", NULL, NULL, NULL);  
+    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
+                NULL, NULL, NULL);  
  
     if (strcmp(client->method, "GET") == 0) {
         r->body[0] = '[';
@@ -352,6 +358,23 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
+
+
+    // client->body = strchr(client->body, ':') + 2;
+    // char username[BUFF_SIZE];
+    // char password[BUFF_SIZE];
+    char *username;
+    char *password;
+    char *p = strchr(client->body, ':') + 2;
+    username = p;
+    p = strchr(p, '"');
+    *p = '\0';
+    p = strchr(p, ':') + 2;
+    password = p;
+    p = strchr(p, '"');
+    *p = '\0';    
+    printf("%s %s\n", username, password);
+    exit(0);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
