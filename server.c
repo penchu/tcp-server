@@ -330,7 +330,6 @@ int handle_users(Clients *client, Response *r) {
         r->body[0] = '[';
         sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
         r->body[strlen(r->body)-2] = ']';
-
         GET_response(client, r);
   
     }
@@ -359,33 +358,27 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
-
-    // client->body = strchr(client->body, ':') + 2;
-    // char username[BUFF_SIZE];
-    // char password[BUFF_SIZE];
     char *username;
     char *password;
     char *p = strchr(client->body, ':') + 2;
-    username = p;
+    username = p;    
     p = strchr(p, '"');
-    *p = '\0';
-    p = strchr(p, ':') + 2;
-    password = p;
+    *p = '\0';  
+    p = strchr(p+1, ':') + 2;  
+    password = p;    
     p = strchr(p, '"');
     *p = '\0';    
-    printf("%s %s\n", username, password);
-    exit(0);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, timestamp) VALUES ('%s', '%s', '%s')", 
-            out, client->body, buff_time);
+    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp) VALUES ('%s', '%s', '%s', '%s')", 
+            out, username, password, buff_time);
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     snprintf(r->status_code, sizeof(r->status_code), "%s", "201 Created");
     snprintf(r->type, sizeof(r->type), "%s", "application/json");  
-    snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"}\n", 
-            out, client->body, buff_time);
+    snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"password\":\"%s\",\"timestamp\":\"%s\"}\n", 
+            out, username, password, buff_time);
 
     return 0;
 }
@@ -393,13 +386,10 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names) {
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
 
-    // Callback *callback_struct = (Callback *)callback_data;
     Response *r = (Response *)callback_data;
-    snprintf(r->body + strlen(r->body), sizeof(r->body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
-             values[0], values[1], values[2]);
-    // callback_struct->position += snprintf(callback_struct->buff + callback_struct->position, sizeof(callback_struct->buff), 
-    //                             "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
-    //                             values[0], values[1], values[2]);  
+    snprintf(r->body + strlen(r->body), sizeof(r->body), 
+             "{\"uuid\":\"%s\",\"username\":\"%s\",\"password\":\"%s\",\"timestamp\":\"%s\"},\n",
+             values[0], values[1], values[2], values[3]);
 
     return 0;
 }
