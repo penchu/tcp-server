@@ -60,6 +60,7 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
 int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
+int hashing_passwd(char *passwd);
 
 int main(void) {
     int sockfd;
@@ -367,7 +368,9 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     p = strchr(p+1, ':') + 2;  
     password = p;    
     p = strchr(p, '"');
-    *p = '\0';    
+    *p = '\0';  
+
+    hashing_passwd(password);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -437,6 +440,20 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
     }
     else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
+
+    return 0;
+}
+
+int hashing_passwd(char *passwd) {
+
+    char out[crypto_pwhash_STRBYTES];
+    unsigned long long passwdlen = strlen(passwd);
+
+    if (crypto_pwhash_str(out, passwd, passwdlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        printf("500 Internal Server Error\n"); 
+        //this should be a built response from the server
+    }
+    printf("hash: %s\n", out);
 
     return 0;
 }
