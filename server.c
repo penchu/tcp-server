@@ -54,13 +54,14 @@ int db_store(char *buff, char *buff_send);
 int handle_request(Clients *client);
 int handle_health(Clients *client, Response *r);
 int handle_metrics(Clients *client, Response *r);
-int handle_users(Clients *client, Response *r);
+int handle_users(sqlite3 *sql_db, Clients *client, Response *r);
 int db_users(sqlite3 *sql_db, Clients *client, Response *r);
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names);
 int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
 char *hashing_passwd(char *passwd, Response *r);
+int handle_login(sqlite3 *sql_db, Clients *client, Response *r);
 
 int main(void) {
     int sockfd;
@@ -270,6 +271,11 @@ int handle_request(Clients *client) {
     Response response;
     memset(&response, 0, sizeof(Response));
 
+    sqlite3 *sql_db;
+    sqlite3_open("monit_users.db", &sql_db);
+    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
+                NULL, NULL, NULL);  
+
     if (strcmp("/health", client->path) == 0) {
         handle_health(client, &response);
     }
@@ -277,7 +283,10 @@ int handle_request(Clients *client) {
         handle_metrics(client, &response);
     }
     else if (strstr(client->path, "/users") != NULL) {
-        handle_users(client, &response);
+        handle_users(sql_db, client, &response);
+    }
+    else if (strstr(client->path, "/login") != NULL) {
+        handle_login(sql_db, client, &response);
     }
 
     char buff_send[BUFF_SIZE*40];
@@ -319,13 +328,13 @@ int handle_metrics(Clients *client, Response *r) {
     return 0;
 }
 
-int handle_users(Clients *client, Response *r) {
+int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
 
-    sqlite3 *sql_db;
-    sqlite3_open("monit_users.db", &sql_db);
-    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
-                NULL, NULL, NULL);  
+    // sqlite3 *sql_db;
+    // sqlite3_open("monit_users.db", &sql_db);
+    // sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
+    //             NULL, NULL, NULL);  
  
     if (strcmp(client->method, "GET") == 0) {
         r->body[0] = '[';
@@ -453,9 +462,53 @@ char *hashing_passwd(char *passwd, Response *r) {
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Internal server error\"}\n");      
     }
-    // printf("hash: %s\n", out);
-    // char *p = out;
+
     return out;
+}
+
+int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
+    server.requests++;
+
+    char *username;
+    char *password;
+    char *p = strchr(client->body, ':') + 2;
+    username = p;    
+    p = strchr(p, '"');
+    *p = '\0';  
+    p = strchr(p+1, ':') + 2;  
+    password = p;    
+    p = strchr(p, '"');
+    *p = '\0';  
+
+    const char *hashed_password;
+
+    char buff_db[BUFF_DB_SIZE];
+    memset(buff_db, 0, sizeof(buff_db));
+    snprintf(buff_db, BUFF_DB_SIZE, "SELECT password FROM users WHERE username = ('%s')", username);
+
+    sqlite3_stmt *ppStmt;
+    sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);
+    if (sqlite3_step(ppStmt) != SQLITE_ROW) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n");   
+    }
+    else {
+        hashed_password = sqlite3_column_text(ppStmt, 0);
+    }    
+
+    // printf("%s\n", hashed_password);
+
+    if (crypto_pwhash_str_verify (hashed_password, password, strlen(password)) != 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n"); 
+    }
+    else {
+        // generating JWT token for the client
+    }
+
+    return 0;
 }
 
 
