@@ -60,7 +60,7 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
 int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
-int hashing_passwd(char *passwd);
+char *hashing_passwd(char *passwd, Response *r);
 
 int main(void) {
     int sockfd;
@@ -370,7 +370,7 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     p = strchr(p, '"');
     *p = '\0';  
 
-    hashing_passwd(password);
+    password = hashing_passwd(password, r);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -380,8 +380,7 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     snprintf(r->status_code, sizeof(r->status_code), "%s", "201 Created");
     snprintf(r->type, sizeof(r->type), "%s", "application/json");  
-    snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\",\"username\":\"%s\",\"password\":\"%s\",\"timestamp\":\"%s\"}\n", 
-            out, username, password, buff_time);
+    snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\"}\n", out);
 
     return 0;
 }
@@ -391,8 +390,8 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
 
     Response *r = (Response *)callback_data;
     snprintf(r->body + strlen(r->body), sizeof(r->body), 
-             "{\"uuid\":\"%s\",\"username\":\"%s\",\"password\":\"%s\",\"timestamp\":\"%s\"},\n",
-             values[0], values[1], values[2], values[3]);
+             "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
+             values[0], values[1], values[3]);
 
     return 0;
 }
@@ -444,18 +443,19 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
     return 0;
 }
 
-int hashing_passwd(char *passwd) {
+char *hashing_passwd(char *passwd, Response *r) {
 
-    char out[crypto_pwhash_STRBYTES];
+    static char out[crypto_pwhash_STRBYTES];
     unsigned long long passwdlen = strlen(passwd);
 
     if (crypto_pwhash_str(out, passwd, passwdlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        printf("500 Internal Server Error\n"); 
-        //this should be a built response from the server
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "500 Internal Server Error");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Internal server error\"}\n");      
     }
-    printf("hash: %s\n", out);
-
-    return 0;
+    // printf("hash: %s\n", out);
+    // char *p = out;
+    return out;
 }
 
 
