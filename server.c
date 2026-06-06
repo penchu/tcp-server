@@ -10,6 +10,7 @@
 #include <sqlite3.h>
 #include <uuid/uuid.h>
 #include <sodium.h>
+#include <jwt.h>
 
 #define MAX_CLIENTS 10
 #define BUFF_SIZE 128
@@ -62,6 +63,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
 char *hashing_passwd(char *passwd, Response *r);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r);
+int JWT_Token(const char *user_id);
 
 int main(void) {
     int sockfd;
@@ -481,10 +483,11 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
     *p = '\0';  
 
     const char *hashed_password;
+    const char *user_id;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "SELECT password FROM users WHERE username = ('%s')", username);
+    snprintf(buff_db, BUFF_DB_SIZE, "SELECT password, UUID FROM users WHERE username = ('%s')", username);
 
     sqlite3_stmt *ppStmt;
     sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);
@@ -495,9 +498,11 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
     }
     else {
         hashed_password = sqlite3_column_text(ppStmt, 0);
+        user_id = sqlite3_column_text(ppStmt, 1);
     }    
 
     // printf("%s\n", hashed_password);
+    // printf("%s\n", user_id);
 
     if (crypto_pwhash_str_verify (hashed_password, password, strlen(password)) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
@@ -505,9 +510,28 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n"); 
     }
     else {
-        // generating JWT token for the client
+        JWT_Token(user_id);
     }
 
+    return 0;
+}
+
+int JWT_Token(const char *user_id) {
+
+    const char *jwt_key = getenv("JWT_SECRET");
+
+    jwt_t *jwt;
+    jwt_new(&jwt); 	
+    
+    jwt_set_alg(jwt, JWT_ALG_HS256, jwt_key, strlen(jwt_key));
+
+    jwt_add_grant(jwt, "sub", user_id);
+    jwt_add_grant_int(jwt, "exp", time(NULL)+3600);
+    char *signed_token_str = jwt_encode_str(jwt);
+
+    char *str = jwt_dump_str(jwt, 1);
+    printf("%s\n", signed_token_str);
+    
     return 0;
 }
 
