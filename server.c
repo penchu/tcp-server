@@ -26,6 +26,7 @@ typedef struct {
     char *path;
     char *version;
     char *body;
+    char *token;
 } Clients;
 
 typedef struct {
@@ -63,7 +64,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
 char *hashing_passwd(char *passwd, Response *r);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r);
-int JWT_Token(const char *user_id);
+int JWT_Token(const char *user_id, Response *r);
 
 int main(void) {
     int sockfd;
@@ -198,11 +199,17 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 }
 
 int http_header_parse(Clients *client) {
-    // char *method;
-    // char *path;
-    // char *version;
 
     // printf("%s\n", client->buff);
+
+    client->token = strstr(client->buff, "Authorization: Bearer ");
+    client->token += strlen("Authorization: Bearer ");
+    // client->token[strcspn(client->token, "\r")] = '\0';
+    char *r = strchr(client->token, '\r');
+    *r = '\0';
+
+    printf("%s\n", client->token);
+    // exit(0);
     
     int cont_len;
     char *length;
@@ -213,16 +220,7 @@ int http_header_parse(Clients *client) {
     if (length) strtoul(length, &endptr, 0);
     
     char *body_str = strstr(client->buff, "\r\n\r\n");
-    client->body = body_str + 4;
-
-    // printf("%s\n", client->buff);
-    // if (strstr(client->buff, "application/json")) {
-    //     client->body = strchr(client->body, ':') + 2;
-    //     *(strchr(client->body + 1, '"')) = '\0';
-    // }  
-    // printf("%s\n", client->buff);
-    // printf("%s\n", client->body);
-    // exit(0);
+    client->body = body_str + 4; 
 
     char *p = client->buff;
     client->method = p;
@@ -244,9 +242,9 @@ int http_header_parse(Clients *client) {
     }
     client->version[strcspn(client->version, "\r")] = '\0';
     // printf("method: %s, path: %s, version: %s\n", client->method, client->path, client->version);    
-
+    
     handle_request(client);
-
+    
     return 0;
 }
 
@@ -272,7 +270,7 @@ int handle_request(Clients *client) {
     // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
     Response response;
     memset(&response, 0, sizeof(Response));
-
+    
     sqlite3 *sql_db;
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
@@ -290,7 +288,7 @@ int handle_request(Clients *client) {
     else if (strstr(client->path, "/login") != NULL) {
         handle_login(sql_db, client, &response);
     }
-
+    
     char buff_send[BUFF_SIZE*40];
     memset(buff_send, 0, sizeof(buff_send));
     int position;
@@ -332,11 +330,6 @@ int handle_metrics(Clients *client, Response *r) {
 
 int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
-
-    // sqlite3 *sql_db;
-    // sqlite3_open("monit_users.db", &sql_db);
-    // sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
-    //             NULL, NULL, NULL);  
  
     if (strcmp(client->method, "GET") == 0) {
         r->body[0] = '[';
@@ -415,7 +408,9 @@ int GET_response(Clients *client, Response *r) {
     return 0;    
 }
 
-int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {    
+int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
+
+
     
     char *uuid = strrchr(client->path, '/') + 1;
 
@@ -436,6 +431,8 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 } 
 
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
+
+    // printf("%s\n", client->buff);
 
     char *uuid = strrchr(client->path, '/') + 1;
 
@@ -501,22 +498,19 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
         user_id = sqlite3_column_text(ppStmt, 1);
     }    
 
-    // printf("%s\n", hashed_password);
-    // printf("%s\n", user_id);
-
     if (crypto_pwhash_str_verify (hashed_password, password, strlen(password)) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n"); 
     }
     else {
-        JWT_Token(user_id);
+        JWT_Token(user_id, r);
     }
 
     return 0;
 }
 
-int JWT_Token(const char *user_id) {
+int JWT_Token(const char *user_id, Response *r) {
 
     const char *jwt_key = getenv("JWT_SECRET");
 
@@ -529,8 +523,9 @@ int JWT_Token(const char *user_id) {
     jwt_add_grant_int(jwt, "exp", time(NULL)+3600);
     char *signed_token_str = jwt_encode_str(jwt);
 
-    char *str = jwt_dump_str(jwt, 1);
-    printf("%s\n", signed_token_str);
+    snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
+    snprintf(r->type, sizeof(r->type), "%s", "application/json");
+    snprintf(r->body, sizeof(r->body), "{\"token\": \"%s\"}\n", signed_token_str);
     
     return 0;
 }
