@@ -200,28 +200,33 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 
 int http_header_parse(Clients *client) {
 
-    // printf("%s\n", client->buff);
-
-    client->token = strstr(client->buff, "Authorization: Bearer ");
-    client->token += strlen("Authorization: Bearer ");
-    // client->token[strcspn(client->token, "\r")] = '\0';
-    char *r = strchr(client->token, '\r');
-    *r = '\0';
-
-    printf("%s\n", client->token);
+    // printf("%s\n", client->buff);    
+    // if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
+    //     client->token += strlen("Authorization: Bearer ");
+    // }   
+    // client->token[strcspn(client->token, "\r")] = '\0';    
+    // printf("%s\n", client->token);
+    // char *r = strchr(client->token, '\r');
+    // *r = '\0';
+    // printf("%s\n", client->token);
     // exit(0);
     
-    int cont_len;
-    char *length;
-    char *endptr;
-    if ((length = strstr(client->buff, "Content-Length")) != NULL) {        
-        length = strchr(length, ':') + 1;
-    }  
-    if (length) strtoul(length, &endptr, 0);
+    // int cont_len;
+    // char *length;
+    // char *endptr;
+    // if ((length = strstr(client->buff, "Content-Length")) != NULL) {        
+    //     length = strchr(length, ':') + 1;
+    // }  
+    // if (length) strtoul(length, &endptr, 0);
     
-    char *body_str = strstr(client->buff, "\r\n\r\n");
-    client->body = body_str + 4; 
+    char *body_str = strstr(client->buff, "\r\n\r\n");    
+    client->body = body_str + 4;    
 
+    if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
+        client->token += strlen("Authorization: Bearer ");
+    }   
+    client->token[strcspn(client->token, "\r")] = '\0'; 
+    
     char *p = client->buff;
     client->method = p;
 
@@ -241,7 +246,7 @@ int http_header_parse(Clients *client) {
         p++;
     }
     client->version[strcspn(client->version, "\r")] = '\0';
-    // printf("method: %s, path: %s, version: %s\n", client->method, client->path, client->version);    
+    printf("method: %s, path: %s, version: %s, token: %s\n", client->method, client->path, client->version, client->token);    
     
     handle_request(client);
     
@@ -513,6 +518,7 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
 int JWT_Token(const char *user_id, Response *r) {
 
     const char *jwt_key = getenv("JWT_SECRET");
+    // printf("secret: %s\n", jwt_key);
 
     jwt_t *jwt;
     jwt_new(&jwt); 	
