@@ -218,8 +218,8 @@ int http_header_parse(Clients *client) {
     //     length = strchr(length, ':') + 1;
     // }  
     // if (length) strtoul(length, &endptr, 0);
-    
-    char *body_str = strstr(client->buff, "\r\n\r\n");    
+  
+    char *body_str = strstr(client->buff, "\r\n\r\n");   
     client->body = body_str + 4;    
 
     if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
@@ -246,7 +246,7 @@ int http_header_parse(Clients *client) {
         p++;
     }
     client->version[strcspn(client->version, "\r")] = '\0';
-    printf("method: %s, path: %s, version: %s, token: %s\n", client->method, client->path, client->version, client->token);    
+    // printf("method: %s, path: %s, version: %s\n", client->method, client->path, client->version);    
     
     handle_request(client);
     
@@ -415,7 +415,14 @@ int GET_response(Clients *client, Response *r) {
 
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
 
-
+    jwt_t *jwt;
+    const char *jwt_key = getenv("JWT_SECRET");
+    if (jwt_decode (&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        return 0;
+    }   
     
     char *uuid = strrchr(client->path, '/') + 1;
 
@@ -438,6 +445,14 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     // printf("%s\n", client->buff);
+    jwt_t *jwt;
+    const char *jwt_key = getenv("JWT_SECRET");
+    if (jwt_decode (&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        return 0;
+    }   
 
     char *uuid = strrchr(client->path, '/') + 1;
 
@@ -533,6 +548,7 @@ int JWT_Token(const char *user_id, Response *r) {
     snprintf(r->type, sizeof(r->type), "%s", "application/json");
     snprintf(r->body, sizeof(r->body), "{\"token\": \"%s\"}\n", signed_token_str);
     
+    jwt_free(jwt);
     return 0;
 }
 
