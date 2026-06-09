@@ -224,8 +224,8 @@ int http_header_parse(Clients *client) {
     
     if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
         client->token += strlen("Authorization: Bearer ");
+        client->token[strcspn(client->token, "\r")] = '\0'; 
     }   
-    client->token[strcspn(client->token, "\r")] = '\0'; 
         
     char *p = client->buff;
     client->method = p;
