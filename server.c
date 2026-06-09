@@ -256,12 +256,7 @@ int http_header_parse(Clients *client) {
 int db_store(char *buff, char *buff_send) {
     sqlite3 *sql_db;
     sqlite3_open("monitoring.db", &sql_db);
-    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL); 
-    
-    // char buff_send[BUFF_SIZE];                        
-    // time_t now = time(NULL);
-    // struct tm *t = localtime(&now);
-    // strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);                           
+    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL);                      
     
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -415,7 +410,14 @@ int GET_response(Clients *client, Response *r) {
 
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
 
-    // char *uuid = strrchr(client->path, '/') + 1;
+    if (!client->token) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        return 0;
+    }
+
+    char *uuid = strrchr(client->path, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
     if (jwt_decode(&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
@@ -424,14 +426,14 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         return 0;
     }   
-    // if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-    //     snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-    //     snprintf(r->type, sizeof(r->type), "%s", "application/json");
-    //     snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
-    //     return 0; //probably should make this error message compiling into a separate function
-    // }
+    if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        return 0; //probably should make this error message compiling into a separate function
+    }
     
-    char *uuid = strrchr(client->path, '/') + 1;
+    // char *uuid = strrchr(client->path, '/') + 1;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -451,8 +453,15 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
+    if (!client->token) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        return 0;
+    }
+
     // printf("%s\n", client->buff);
-    // char *uuid = strrchr(client->path, '/') + 1;
+    char *uuid = strrchr(client->path, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
     if (jwt_decode(&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
@@ -461,14 +470,14 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         return 0;
     }   
-    // if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-    //     snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-    //     snprintf(r->type, sizeof(r->type), "%s", "application/json");
-    //     snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
-    //     return 0; //probably should make this error message compiling into a separate function
-    // }
+    if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        return 0; //probably should make this error message compiling into a separate function
+    }
 
-    char *uuid = strrchr(client->path, '/') + 1;
+    // char *uuid = strrchr(client->path, '/') + 1;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
