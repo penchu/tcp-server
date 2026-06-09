@@ -221,12 +221,12 @@ int http_header_parse(Clients *client) {
   
     char *body_str = strstr(client->buff, "\r\n\r\n");   
     client->body = body_str + 4;    
-
+    
     if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
         client->token += strlen("Authorization: Bearer ");
     }   
     client->token[strcspn(client->token, "\r")] = '\0'; 
-    
+        
     char *p = client->buff;
     client->method = p;
 
@@ -415,7 +415,7 @@ int GET_response(Clients *client, Response *r) {
 
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
 
-    char *uuid = strrchr(client->path, '/') + 1;
+    // char *uuid = strrchr(client->path, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
     if (jwt_decode(&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
@@ -424,14 +424,14 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         return 0;
     }   
-    if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
-        return 0; //probably should make this error message compiling into a separate function
-    }
+    // if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
+    //     snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+    //     snprintf(r->type, sizeof(r->type), "%s", "application/json");
+    //     snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+    //     return 0; //probably should make this error message compiling into a separate function
+    // }
     
-    // char *uuid = strrchr(client->path, '/') + 1;
+    char *uuid = strrchr(client->path, '/') + 1;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -452,7 +452,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     // printf("%s\n", client->buff);
-    char *uuid = strrchr(client->path, '/') + 1;
+    // char *uuid = strrchr(client->path, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
     if (jwt_decode(&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
@@ -461,14 +461,14 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         return 0;
     }   
-    if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
-        return 0; //probably should make this error message compiling into a separate function
-    }
+    // if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
+    //     snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+    //     snprintf(r->type, sizeof(r->type), "%s", "application/json");
+    //     snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+    //     return 0; //probably should make this error message compiling into a separate function
+    // }
 
-    // char *uuid = strrchr(client->path, '/') + 1;
+    char *uuid = strrchr(client->path, '/') + 1;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
