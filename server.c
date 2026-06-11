@@ -16,7 +16,6 @@
 #define BUFF_SIZE 128
 #define BUFF_DB_SIZE 512
 
-// time_t now;
 
 typedef struct {
     int cl_fd;
@@ -273,7 +272,7 @@ int handle_request(Clients *client) {
     
     sqlite3 *sql_db;
     sqlite3_open("monit_users.db", &sql_db);
-    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT)", 
+    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT, is_admin INTEGER)", 
                 NULL, NULL, NULL);  
 
     if (strcmp("/health", client->path) == 0) {
@@ -378,8 +377,8 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp) VALUES ('%s', '%s', '%s', '%s')", 
-            out, username, password, buff_time);
+    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
+            out, username, password, buff_time, "1");
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     snprintf(r->status_code, sizeof(r->status_code), "%s", "201 Created");
@@ -424,12 +423,14 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        jwt_free(jwt);
         return 0;
     }   
     if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        jwt_free(jwt);
         return 0; //probably should make this error message compiling into a separate function
     }
     
@@ -447,7 +448,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
     }
     else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
-
+    jwt_free(jwt);
     return 0;
 } 
 
@@ -468,12 +469,14 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        jwt_free(jwt);
         return 0;
     }   
     if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        jwt_free(jwt);
         return 0; //probably should make this error message compiling into a separate function
     }
 
@@ -490,7 +493,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
     }
     else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
-
+    jwt_free(jwt);
     return 0;
 }
 
