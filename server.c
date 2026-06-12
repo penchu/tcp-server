@@ -377,7 +377,7 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
+    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username UNIQUE, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
             out, username, password, buff_time, "1");
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
