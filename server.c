@@ -272,8 +272,11 @@ int handle_request(Clients *client) {
     
     sqlite3 *sql_db;
     sqlite3_open("monit_users.db", &sql_db);
-    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT, password TEXT, timestamp TEXT, is_admin INTEGER)", 
+    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT, is_admin INTEGER)", 
                 NULL, NULL, NULL);  
+
+    // sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT)", 
+    //             NULL, NULL, NULL);  
 
     if (strcmp("/health", client->path) == 0) {
         handle_health(client, &response);
@@ -377,8 +380,12 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username UNIQUE, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
+    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
             out, username, password, buff_time, "1");
+
+    // snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp) VALUES ('%s', '%s', '%s', '%s')", 
+    //         out, username, password, buff_time);
+
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     snprintf(r->status_code, sizeof(r->status_code), "%s", "201 Created");
@@ -439,8 +446,8 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, sizeof(buff_db), "DELETE FROM users WHERE UUID='%s'", uuid);
-    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
-    
+    // printf("uuid: %s\n", uuid);
+    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);    
 
     if (sqlite3_changes(sql_db) == 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
