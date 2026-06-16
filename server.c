@@ -51,7 +51,7 @@ int server_run(int *sockfd);
 int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set);
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr);
 int http_header_parse(Clients *client);
-int db_store(char *buff, char *buff_send);
+// int db_store(char *buff, char *buff_send);
 int handle_request(Clients *client);
 int handle_health(Clients *client, Response *r);
 int handle_metrics(Clients *client, Response *r);
@@ -252,18 +252,18 @@ int http_header_parse(Clients *client) {
     return 0;
 }
 
-int db_store(char *buff, char *buff_send) {
-    sqlite3 *sql_db;
-    sqlite3_open("monitoring.db", &sql_db);
-    sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL);                      
+// int db_store(char *buff, char *buff_send) {
+//     sqlite3 *sql_db;
+//     sqlite3_open("monitoring.db", &sql_db);
+//     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL);                      
     
-    char buff_db[BUFF_DB_SIZE];
-    memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
-    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+//     char buff_db[BUFF_DB_SIZE];
+//     memset(buff_db, 0, sizeof(buff_db));
+//     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
+//     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
     
-    return 0;
-}
+//     return 0;
+// }
 
 int handle_request(Clients *client) {
     // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
@@ -304,6 +304,8 @@ int handle_request(Clients *client) {
     }
     else position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
     send(client->cl_fd, buff_send, position, 0);
+        
+    sqlite3_close(sql_db);
 
     return 0;
 }
@@ -446,8 +448,9 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, sizeof(buff_db), "DELETE FROM users WHERE UUID='%s'", uuid);
-    // printf("uuid: %s\n", uuid);
-    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);    
+    // printf("uuid: %s buff_db: %s\n", uuid, buff_db);
+    int rc = sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);    
+    printf("exec rc: %d\n", rc);
 
     if (sqlite3_changes(sql_db) == 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
@@ -533,8 +536,7 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
     *p = '\0';  
 
     const char *hashed_password;
-    const char *user_id;
-
+    const char *user_id; 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, BUFF_DB_SIZE, "SELECT password, UUID FROM users WHERE username = ('%s')", username);
@@ -560,6 +562,7 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
         JWT_Token(user_id, r);
     }
 
+    sqlite3_finalize(ppStmt);
     return 0;
 }
 
