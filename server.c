@@ -21,6 +21,12 @@ typedef struct {
     int cl_fd;
     char buff[1024];
     int position;
+    char method_arr[BUFF_SIZE];
+    char path_arr[BUFF_SIZE];
+    char version_arr[BUFF_SIZE];
+    char token_arr[BUFF_SIZE];
+    char username[BUFF_SIZE];
+    char password[BUFF_SIZE];
     char *method;
     char *path;
     char *version;
@@ -199,24 +205,59 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 
 int http_header_parse(Clients *client) {
 
-    // printf("%s\n", client->buff);    
-    // if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
-    //     client->token += strlen("Authorization: Bearer ");
-    // }   
-    // client->token[strcspn(client->token, "\r")] = '\0';    
-    // printf("%s\n", client->token);
-    // char *r = strchr(client->token, '\r');
-    // *r = '\0';
-    // printf("%s\n", client->token);
-    // exit(0);
+    char *position;
+    int counter = 0;
+    while (client->buff[counter] != ' ') {
+        counter++;
+    }   
+    strncpy(client->method_arr, client->buff, counter);
+
+    position = client->buff + counter + 1;
+    counter = 0;
+    while (*(position + counter) != ' ') {
+        counter++;
+    }
+    strncpy(client->path_arr, position, counter);
+
+    position += counter + 1;
+    counter = 0;
+    while (*(position + counter) != '\r') {
+        counter++;
+    }
+    strncpy(client->version_arr, position, counter);
+    counter = 0;
+
+    if ((position = strstr(client->buff, "Authorization: Bearer "))) {
+        position += strlen("Authorization: Bearer ");
+        while (*(position + counter) != '\r') {
+            counter++;
+        }
+        strncpy(client->token_arr, position, counter);
+    }      
+    printf("token: %s\n", client->token_arr);
     
-    // int cont_len;
-    // char *length;
-    // char *endptr;
-    // if ((length = strstr(client->buff, "Content-Length")) != NULL) {        
-    //     length = strchr(length, ':') + 1;
-    // }  
-    // if (length) strtoul(length, &endptr, 0);
+    position = strstr(client->buff, "\r\n\r\n") + strlen("\r\n\r\n");
+    if ((position = strstr(client->buff, "username"))) {
+        position += strlen("username") + 3;
+        while (*(position + counter) != '\"') {
+            counter++;
+        }
+        strncpy(client->username, position, counter);
+    }
+    counter = 0;
+
+    if ((position = strstr(client->buff, "password"))) {
+        position += strlen("password") + 3;
+        while (*(position + counter) != '\"') {
+            counter++;
+        }
+        strncpy(client->password, position, counter);
+    }
+    printf("token: %s\n", client->token_arr);
+    // printf("method: %s, path: %s, version: %s\n token: %s\n username: %s, password: %s\n", 
+    //         client->method_arr, client->path_arr, client->version_arr, client->token_arr, client->username, client->password);
+
+
   
     char *body_str = strstr(client->buff, "\r\n\r\n");   
     client->body = body_str + 4;    
@@ -255,13 +296,11 @@ int http_header_parse(Clients *client) {
 // int db_store(char *buff, char *buff_send) {
 //     sqlite3 *sql_db;
 //     sqlite3_open("monitoring.db", &sql_db);
-//     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL);                      
-    
+//     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL);  
 //     char buff_db[BUFF_DB_SIZE];
 //     memset(buff_db, 0, sizeof(buff_db));
 //     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
-//     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
-    
+//     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);    
 //     return 0;
 // }
 
@@ -274,9 +313,6 @@ int handle_request(Clients *client) {
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT, is_admin INTEGER)", 
                 NULL, NULL, NULL);  
-
-    // sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT)", 
-    //             NULL, NULL, NULL);  
 
     if (strcmp("/health", client->path) == 0) {
         handle_health(client, &response);
@@ -443,7 +479,6 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
         return 0; //probably should make this error message compiling into a separate function
     }
     
-    // char *uuid = strrchr(client->path, '/') + 1;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -471,7 +506,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         return 0;
     }
 
-    // printf("%s\n", client->buff);
+    // printf("%s\n", client->body);
     char *uuid = strrchr(client->path, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
@@ -489,8 +524,6 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         jwt_free(jwt);
         return 0; //probably should make this error message compiling into a separate function
     }
-
-    // char *uuid = strrchr(client->path, '/') + 1;
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
