@@ -127,6 +127,7 @@ int server_run(int *sockfd) {
 
     int max_fd = *sockfd;
     char buff[BUFF_SIZE];
+    memset(buff, 0, sizeof(buff));
     int rcv_srvr;    
 
     Clients client_list[MAX_CLIENTS];
@@ -154,14 +155,6 @@ int server_run(int *sockfd) {
                         buff[rcv_srvr] = '\0';
                         client_list[i].cl_fd = i;
                         handle_client_data(&client_list[i], buff, &rcv_srvr);
-                
-                        // char buff_send[BUFF_SIZE];
-                        // time_t now = time(NULL);
-                        // struct tm *t = localtime(&now);
-                        // strftime(buff_send, sizeof(buff_send), "%d-%m-%Y %H:%M:%S", t);
-                        // strncat(buff_send, ":log recorded", 14);
-                        // send(i, buff_send, sizeof(buff_send), 0);
-                        // db_store(buff, buff_send);
                     }
                     else {
                         // printf("fd clr\n");
@@ -192,18 +185,24 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
     int working_pos = client->position;
-    
+    // printf("%s", buff);
     memcpy(&client->buff[working_pos], buff, *rcv_srvr);
     client->position += *rcv_srvr;
-
+    
     if (strstr(client->buff, "\r\n\r\n") != NULL) {
         http_header_parse(client);
     }
-
+    printf("%s", client->buff);
     return 0;
 }
 
 int http_header_parse(Clients *client) {
+
+    // memset(client->buff, 0, sizeof(client->buff));
+    // memset(client->method_arr, 0, sizeof(client->method_arr));
+    // memset(client->path_arr, 0, sizeof(client->path_arr));
+    // memset(client->version_arr, 0, sizeof(client->version_arr));
+    // memset(client->token_arr, 0, sizeof(client->token_arr));
 
     char *position;
     int counter = 0;
@@ -211,6 +210,7 @@ int http_header_parse(Clients *client) {
         counter++;
     }   
     strncpy(client->method_arr, client->buff, counter);
+    client->method_arr[counter] = '\0';
 
     position = client->buff + counter + 1;
     counter = 0;
@@ -218,6 +218,7 @@ int http_header_parse(Clients *client) {
         counter++;
     }
     strncpy(client->path_arr, position, counter);
+    client->path_arr[counter] = '\0';
 
     position += counter + 1;
     counter = 0;
@@ -225,16 +226,19 @@ int http_header_parse(Clients *client) {
         counter++;
     }
     strncpy(client->version_arr, position, counter);
-    counter = 0;
+    client->version_arr[counter] = '\0';
 
+    counter = 0;
     if ((position = strstr(client->buff, "Authorization: Bearer "))) {
         position += strlen("Authorization: Bearer ");
         while (*(position + counter) != '\r') {
             counter++;
         }
         strncpy(client->token_arr, position, counter);
-    }      
-    printf("token: %s\n", client->token_arr);
+        client->token_arr[counter] = '\0';
+        counter = 0; 
+    }         
+    // printf("token: %s\n", client->token_arr);
     
     position = strstr(client->buff, "\r\n\r\n") + strlen("\r\n\r\n");
     if ((position = strstr(client->buff, "username"))) {
@@ -243,33 +247,33 @@ int http_header_parse(Clients *client) {
             counter++;
         }
         strncpy(client->username, position, counter);
+        client->username[counter] = '\0';
+        counter = 0;
     }
-    counter = 0;
-
+    
     if ((position = strstr(client->buff, "password"))) {
         position += strlen("password") + 3;
         while (*(position + counter) != '\"') {
             counter++;
         }
         strncpy(client->password, position, counter);
+        client->password[counter] = '\0';
     }
-    printf("token: %s\n", client->token_arr);
+    // printf("token: %s\n", client->token_arr);
     // printf("method: %s, path: %s, version: %s\n token: %s\n username: %s, password: %s\n", 
     //         client->method_arr, client->path_arr, client->version_arr, client->token_arr, client->username, client->password);
 
 
-  
+    exit(0);
+
     char *body_str = strstr(client->buff, "\r\n\r\n");   
-    client->body = body_str + 4;    
-    
+    client->body = body_str + 4;        
     if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
         client->token += strlen("Authorization: Bearer ");
         client->token[strcspn(client->token, "\r")] = '\0'; 
-    }   
-        
+    }           
     char *p = client->buff;
     client->method = p;
-
     int i = 0;
     while (*p) {
         if (*p == ' ') {
