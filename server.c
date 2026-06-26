@@ -11,6 +11,7 @@
 #include <uuid/uuid.h>
 #include <sodium.h>
 #include <jwt.h>
+#include <errno.h>
 
 #define MAX_CLIENTS 10
 #define BUFF_SIZE 128
@@ -132,7 +133,8 @@ int server_run(int *sockfd) {
 
     Clients client_list[MAX_CLIENTS];
     
-    while (1) {        
+    while (1) {   
+        memset(buff, 0, sizeof(buff));     
         fd_set read_set = master_set;
         sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
         if (sel_val < 0) {
@@ -157,7 +159,6 @@ int server_run(int *sockfd) {
                         handle_client_data(&client_list[i], buff, &rcv_srvr);
                     }
                     else {
-                        // printf("fd clr\n");
                         FD_CLR(i, &master_set);
                         memset(&client_list[i], 0, sizeof(Clients));
                         close(i);
@@ -185,14 +186,31 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
     int working_pos = client->position;
-    // printf("%s", buff);
+    
     memcpy(&client->buff[working_pos], buff, *rcv_srvr);
     client->position += *rcv_srvr;
     
-    if (strstr(client->buff, "\r\n\r\n") != NULL) {
-        http_header_parse(client);
+    char *content_len;
+    char *zero_pos;
+    int len = 0;
+    int z_pos = 0;
+
+    if ((zero_pos = strstr(client->buff, "\r\n\r\n"))) {        
+        zero_pos += strlen("\r\n\r\n");        
+        z_pos = zero_pos - client->buff;
+
+        if ((content_len = strstr(client->buff, "Content-Length:"))){            
+            content_len += strlen("Content-Length:");
+            len = atoi(content_len);     
+        }   
+
+        if ((z_pos + len) == client->position) http_header_parse(client);            
     }
-    printf("%s", client->buff);
+
+    // if (strstr(client->buff, "\r\n\r\n") != NULL) {
+    //     http_header_parse(client);
+    // }
+
     return 0;
 }
 
@@ -263,8 +281,8 @@ int http_header_parse(Clients *client) {
     // printf("method: %s, path: %s, version: %s\n token: %s\n username: %s, password: %s\n", 
     //         client->method_arr, client->path_arr, client->version_arr, client->token_arr, client->username, client->password);
 
-
-    exit(0);
+    // printf("test\n");
+    // exit(0);
 
     char *body_str = strstr(client->buff, "\r\n\r\n");   
     client->body = body_str + 4;        
