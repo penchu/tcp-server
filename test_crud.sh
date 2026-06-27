@@ -7,7 +7,7 @@ curl -v http://localhost:8080/users
 curl -H 'Content-Type: application/json' -d '{ "username":"penchu", "password":"abcd" }' -X POST -v http://localhost:8080/users
 
 # Update user:
-curl -v -X PUT -H "Content-Type: application/json" -d '{"penchu_"}' http://localhost:8080/users/UUID -H "Authorization: Bearer $TOKEN"
+curl -v -X PUT -H "Content-Type: application/json" -d '{"username":"newname","password":"abcd"}' http://localhost:8080/users/UUID -H "Authorization: Bearer $TOKEN"
 
 # Delete user:
 curl -v -X DELETE http://localhost:8080/users/{uuid} -H "Authorization: Bearer $TOKEN"

@@ -25,7 +25,7 @@ typedef struct {
     char method_arr[BUFF_SIZE];
     char path_arr[BUFF_SIZE];
     char version_arr[BUFF_SIZE];
-    char token_arr[BUFF_SIZE];
+    char token_arr[BUFF_SIZE*4];
     char username[BUFF_SIZE];
     char password[BUFF_SIZE];
     char *method;
@@ -148,7 +148,7 @@ int server_run(int *sockfd) {
                 }
                 else {                    
                     rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
-                    printf("recv: %d\n", rcv_srvr);
+                    // printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
                         perror("receive");
                         continue;
@@ -280,32 +280,32 @@ int http_header_parse(Clients *client) {
     // printf("test\n");
     // exit(0);
 
-    printf("username: %s, password: %s\n", client->username, client->password);
+    printf("username: %s, password: %s\n token: %s\n", client->username, client->password, client->token_arr);
 
-    char *body_str = strstr(client->buff, "\r\n\r\n");   
-    client->body = body_str + 4;        
-    if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
-        client->token += strlen("Authorization: Bearer ");
-        client->token[strcspn(client->token, "\r")] = '\0'; 
-    }           
-    char *p = client->buff;
-    client->method = p;
-    int i = 0;
-    while (*p) {
-        if (*p == ' ') {
-            *p = '\0';            
-            if (i == 0) {
-                client->path = p + 1;    
-                i++;        
-            }
-            else {
-                client->version = p + 1;   
-                break;    
-            }   
-        }
-        p++;
-    }
-    client->version[strcspn(client->version, "\r")] = '\0';
+    // char *body_str = strstr(client->buff, "\r\n\r\n");   
+    // client->body = body_str + 4;        
+    // if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
+    //     client->token += strlen("Authorization: Bearer ");
+    //     client->token[strcspn(client->token, "\r")] = '\0'; 
+    // }           
+    // char *p = client->buff;
+    // client->method = p;
+    // int i = 0;
+    // while (*p) {
+    //     if (*p == ' ') {
+    //         *p = '\0';            
+    //         if (i == 0) {
+    //             client->path = p + 1;    
+    //             i++;        
+    //         }
+    //         else {
+    //             client->version = p + 1;   
+    //             break;    
+    //         }   
+    //     }
+    //     p++;
+    // }
+    // client->version[strcspn(client->version, "\r")] = '\0';
     // printf("method: %s, path: %s, version: %s\n", client->method, client->path, client->version);    
     
     handle_request(client);
@@ -323,16 +323,16 @@ int handle_request(Clients *client) {
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT, is_admin INTEGER)", 
                 NULL, NULL, NULL);  
 
-    if (strcmp("/health", client->path) == 0) {
+    if (strcmp("/health", client->path_arr) == 0) {
         handle_health(client, &response);
     }
-    else if (strcmp("/metrics", client->path) == 0) {
+    else if (strcmp("/metrics", client->path_arr) == 0) {
         handle_metrics(client, &response);
     }
-    else if (strstr(client->path, "/users") != NULL) {
+    else if (strstr(client->path_arr, "/users") != NULL) {
         handle_users(sql_db, client, &response);
     }
-    else if (strstr(client->path, "/login") != NULL) {
+    else if (strstr(client->path_arr, "/login") != NULL) {
         handle_login(sql_db, client, &response);
     }
     
@@ -380,20 +380,20 @@ int handle_metrics(Clients *client, Response *r) {
 int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
  
-    if (strcmp(client->method, "GET") == 0) {
+    if (strcmp(client->method_arr, "GET") == 0) {
         r->body[0] = '[';
         sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
         r->body[strlen(r->body)-2] = ']';
         GET_response(client, r);
   
     }
-    else if (strcmp(client->method, "POST") == 0) {
+    else if (strcmp(client->method_arr, "POST") == 0) {
         db_users(sql_db, client, r);
     }
-    else if (strcmp(client->method, "DELETE") == 0) {
+    else if (strcmp(client->method_arr, "DELETE") == 0) {
         DEL_users(sql_db, client, r);
     }
-    else if (strcmp(client->method, "PUT") == 0) {
+    else if (strcmp(client->method_arr, "PUT") == 0) {
         UPDATE_users(sql_db, client, r);
     }
 
@@ -412,23 +412,23 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
-    char *username;
-    char *password;
-    char *p = strchr(client->body, ':') + 2;
-    username = p;    
-    p = strchr(p, '"');
-    *p = '\0';  
-    p = strchr(p+1, ':') + 2;  
-    password = p;    
-    p = strchr(p, '"');
-    *p = '\0';  
+    // char *username;
+    // char *password;
+    // char *p = strchr(client->body, ':') + 2;
+    // username = p;    
+    // p = strchr(p, '"');
+    // *p = '\0';  
+    // p = strchr(p+1, ':') + 2;  
+    // password = p;    
+    // p = strchr(p, '"');
+    // *p = '\0';  
 
-    password = hashing_passwd(password, r);
+    char *password = hashing_passwd(client->password, r);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
-            out, username, password, buff_time, "1");
+            out, client->username, password, buff_time, "1");
 
     // snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp) VALUES ('%s', '%s', '%s', '%s')", 
     //         out, username, password, buff_time);
@@ -463,17 +463,17 @@ int GET_response(Clients *client, Response *r) {
 
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
 
-    if (!client->token) {
+    if (!client->token_arr) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         return 0;
     }
 
-    char *uuid = strrchr(client->path, '/') + 1;
+    char *uuid = strrchr(client->path_arr, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
-    if (jwt_decode(&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
+    if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
@@ -508,26 +508,25 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
-    if (!client->token) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+    if (!client->token_arr) {
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized_1");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         return 0;
     }
 
-    // printf("%s\n", client->body);
-    char *uuid = strrchr(client->path, '/') + 1;
+    char *uuid = strrchr(client->path_arr, '/') + 1;
     jwt_t *jwt;
     const char *jwt_key = getenv("JWT_SECRET");
-    if (jwt_decode(&jwt, client->token, jwt_key, strlen(jwt_key)) != 0) {
+    if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         jwt_free(jwt);
         return 0;
-    }   
+    }    
     if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized_3");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         jwt_free(jwt);
@@ -536,7 +535,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->body, uuid);     
+    snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     if (sqlite3_changes(sql_db) == 0) {
@@ -566,22 +565,22 @@ char *hashing_passwd(char *passwd, Response *r) {
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
 
-    char *username;
-    char *password;
-    char *p = strchr(client->body, ':') + 2;
-    username = p;    
-    p = strchr(p, '"');
-    *p = '\0';  
-    p = strchr(p+1, ':') + 2;  
-    password = p;    
-    p = strchr(p, '"');
-    *p = '\0';  
+    // char *username;
+    // char *password;
+    // char *p = strchr(client->body, ':') + 2;
+    // username = p;    
+    // p = strchr(p, '"');
+    // *p = '\0';  
+    // p = strchr(p+1, ':') + 2;  
+    // password = p;    
+    // p = strchr(p, '"');
+    // *p = '\0';  
 
     const char *hashed_password;
     const char *user_id; 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, BUFF_DB_SIZE, "SELECT password, UUID FROM users WHERE username = ('%s')", username);
+    snprintf(buff_db, BUFF_DB_SIZE, "SELECT password, UUID FROM users WHERE username = ('%s')", client->username);
 
     sqlite3_stmt *ppStmt;
     sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);
@@ -595,7 +594,7 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
         user_id = sqlite3_column_text(ppStmt, 1);
     }    
 
-    if (crypto_pwhash_str_verify (hashed_password, password, strlen(password)) != 0) {
+    if (crypto_pwhash_str_verify (hashed_password, client->password, strlen(client->password)) != 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
         snprintf(r->type, sizeof(r->type), "%s", "application/json");
         snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n"); 
