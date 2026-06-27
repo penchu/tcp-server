@@ -20,7 +20,7 @@
 
 typedef struct {
     int cl_fd;
-    char buff[1024];
+    char buff[BUFF_SIZE*8];
     int position;
     char method_arr[BUFF_SIZE];
     char path_arr[BUFF_SIZE];
@@ -58,7 +58,6 @@ int server_run(int *sockfd);
 int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set);
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr);
 int http_header_parse(Clients *client);
-// int db_store(char *buff, char *buff_send);
 int handle_request(Clients *client);
 int handle_health(Clients *client, Response *r);
 int handle_metrics(Clients *client, Response *r);
@@ -127,7 +126,7 @@ int server_run(int *sockfd) {
     FD_SET(*sockfd, &master_set);
 
     int max_fd = *sockfd;
-    char buff[BUFF_SIZE];
+    char buff[BUFF_SIZE*3];
     memset(buff, 0, sizeof(buff));
     int rcv_srvr;    
 
@@ -149,6 +148,7 @@ int server_run(int *sockfd) {
                 }
                 else {                    
                     rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
+                    printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
                         perror("receive");
                         continue;
@@ -206,10 +206,6 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 
         if ((z_pos + len) == client->position) http_header_parse(client);            
     }
-
-    // if (strstr(client->buff, "\r\n\r\n") != NULL) {
-    //     http_header_parse(client);
-    // }
 
     return 0;
 }
@@ -284,6 +280,8 @@ int http_header_parse(Clients *client) {
     // printf("test\n");
     // exit(0);
 
+    printf("username: %s, password: %s\n", client->username, client->password);
+
     char *body_str = strstr(client->buff, "\r\n\r\n");   
     client->body = body_str + 4;        
     if ((client->token = strstr(client->buff, "Authorization: Bearer "))) {
@@ -314,17 +312,6 @@ int http_header_parse(Clients *client) {
     
     return 0;
 }
-
-// int db_store(char *buff, char *buff_send) {
-//     sqlite3 *sql_db;
-//     sqlite3_open("monitoring.db", &sql_db);
-//     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS metrics (hostname TEXT, timestamp TEXT)", NULL, NULL, NULL);  
-//     char buff_db[BUFF_DB_SIZE];
-//     memset(buff_db, 0, sizeof(buff_db));
-//     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO metrics (hostname, timestamp) VALUES ('%s', '%s')", buff, buff_send);
-//     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);    
-//     return 0;
-// }
 
 int handle_request(Clients *client) {
     // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
