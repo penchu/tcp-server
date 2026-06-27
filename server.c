@@ -535,8 +535,19 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
-    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+
+    if (client->username) {
+        snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
+        sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+    }
+    if (client->password) {
+        char *password = hashing_passwd(client->password, r);
+        snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
+        sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
+    }
+
+    // snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
+    // sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
     if (sqlite3_changes(sql_db) == 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
