@@ -504,12 +504,12 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     
-    if (client->username) {
+    if (client->username[0] != '\0') {
         printf("user: %s\n", client->username);
         snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
         sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
     }    
-    if (client->password) {
+    if (client->password[0] != '\0') {
         printf("pass: %s\n", client->password);
         memset(buff_db, 0, sizeof(buff_db));
         char *password = hashing_passwd(client->password, r);
