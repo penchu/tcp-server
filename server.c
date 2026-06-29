@@ -461,8 +461,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, sizeof(buff_db), "DELETE FROM users WHERE UUID='%s'", uuid);
     // printf("uuid: %s buff_db: %s\n", uuid, buff_db);
-    int rc = sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);    
-    printf("exec rc: %d\n", rc);
+    sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL); // probably a check should be added if it is successful 
 
     if (sqlite3_changes(sql_db) == 0) {
         snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
@@ -505,12 +504,12 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
     
     if (client->username[0] != '\0') {
-        printf("user: %s\n", client->username);
+        // printf("user: %s\n", client->username);
         snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
         sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
     }    
     if (client->password[0] != '\0') {
-        printf("pass: %s\n", client->password);
+        // printf("pass: %s\n", client->password);
         memset(buff_db, 0, sizeof(buff_db));
         char *password = hashing_passwd(client->password, r);
         snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
