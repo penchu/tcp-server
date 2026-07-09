@@ -430,13 +430,6 @@ int GET_response(Clients *client, Response *r) {
 }
 
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
-    
-    // if (!client->token_arr) {
-    //     snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-    //     snprintf(r->type, sizeof(r->type), "%s", "application/json");
-    //     snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
-    //     return 0;
-    // }
 
     char *uuid = strrchr(client->path_arr, '/') + 1;
     jwt_t *jwt = NULL;
@@ -485,13 +478,6 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
 } 
 
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
-
-    // if (!client->token_arr) {
-    //     snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized_1");
-    //     snprintf(r->type, sizeof(r->type), "%s", "application/json");
-    //     snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
-    //     return 0;
-    // }
 
     char *uuid = strrchr(client->path_arr, '/') + 1;
     jwt_t *jwt;
