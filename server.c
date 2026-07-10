@@ -105,7 +105,7 @@ int server_init(int *sockfd) {
         return -1;
     }
     
-    if (listen(*sockfd, 5) < 0) {
+    if (listen(*sockfd, 15) < 0) {
         perror("listen");
         return -1;
     }
@@ -133,7 +133,7 @@ int server_run(int *sockfd) {
     Clients client_list[MAX_CLIENTS];
     
     while (1) {   
-        memset(buff, 0, sizeof(buff));     
+        // memset(buff, 0, sizeof(buff));     
         fd_set read_set = master_set;
         sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
         if (sel_val < 0) {
@@ -141,14 +141,15 @@ int server_run(int *sockfd) {
             continue;
         }
         
-        for (int i = 0; i <= max_fd; i++) {
+        for (int i = 0; i <= max_fd; i++) {            
             if (FD_ISSET(i, &read_set)) {
+                memset(buff, 0, sizeof(buff));
                 if (i == *sockfd) {  
                     handle_new_client(sockfd, &max_fd, &master_set);
                 }
                 else {                    
-                    rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
-                    // printf("recv: %d\n", rcv_srvr);
+                    rcv_srvr = recv(i, buff, sizeof(buff), 0);
+                    printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
                         perror("receive");
                         continue;
