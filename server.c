@@ -47,7 +47,7 @@ typedef struct {
 
 typedef struct {
     char status_code[BUFF_SIZE];
-    char body[BUFF_SIZE*40];
+    char body[BUFF_SIZE*80];
     char type[BUFF_SIZE];
 } Response;
 
@@ -126,7 +126,7 @@ int server_run(int *sockfd) {
     FD_SET(*sockfd, &master_set);
 
     int max_fd = *sockfd;
-    char buff[BUFF_SIZE*3];
+    char buff[BUFF_SIZE];
     memset(buff, 0, sizeof(buff));
     int rcv_srvr;    
 
@@ -149,6 +149,7 @@ int server_run(int *sockfd) {
                 }
                 else {                    
                     rcv_srvr = recv(i, buff, sizeof(buff), 0);
+                    // rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
                     printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
                         perror("receive");
@@ -305,7 +306,7 @@ int handle_request(Clients *client) {
         handle_login(sql_db, client, &response);
     }
     
-    char buff_send[BUFF_SIZE*40];
+    char buff_send[BUFF_SIZE*80];
     memset(buff_send, 0, sizeof(buff_send));
     int position;
     int len = strlen(response.body);
