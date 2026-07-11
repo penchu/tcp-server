@@ -143,12 +143,12 @@ int server_run(int *sockfd) {
         
         for (int i = 0; i <= max_fd; i++) {            
             if (FD_ISSET(i, &read_set)) {
-                memset(buff, 0, sizeof(buff));
+                // memset(buff, 0, sizeof(buff));
                 if (i == *sockfd) {  
                     handle_new_client(sockfd, &max_fd, &master_set);
                 }
                 else {                    
-                    rcv_srvr = recv(i, buff, sizeof(buff), 0);
+                    rcv_srvr = recv(i, buff, (sizeof(buff)-1), 0);
                     // rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
                     printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
@@ -189,8 +189,8 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
     int working_pos = client->position;
     
-    memcpy(&client->buff[working_pos], buff, *rcv_srvr);
-    client->position += *rcv_srvr;
+    memcpy(&client->buff[working_pos], buff, *rcv_srvr-1);
+    client->position += *rcv_srvr-1;
     
     char *content_len;
     char *zero_pos;
