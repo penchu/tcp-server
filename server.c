@@ -20,7 +20,7 @@
 
 typedef struct {
     int cl_fd;
-    char buff[BUFF_SIZE*8];
+    char buff[BUFF_SIZE*5];
     int position;
     char method_arr[BUFF_SIZE];
     char path_arr[BUFF_SIZE];
@@ -28,11 +28,6 @@ typedef struct {
     char token_arr[BUFF_SIZE*4];
     char username[BUFF_SIZE];
     char password[BUFF_SIZE];
-    char *method;
-    char *path;
-    char *version;
-    char *body;
-    char *token;
 } Clients;
 
 typedef struct {
@@ -56,7 +51,7 @@ Server server;
 int server_init(int *sockfd);
 int server_run(int *sockfd);
 int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set);
-int handle_client_data(Clients *client, char *buff, int *rcv_srvr);
+int handle_client_data(Clients *client, char *buff, int rcv_srvr);
 int http_header_parse(Clients *client);
 int handle_request(Clients *client);
 int handle_health(Clients *client, Response *r);
@@ -148,17 +143,16 @@ int server_run(int *sockfd) {
                     handle_new_client(sockfd, &max_fd, &master_set);
                 }
                 else {                    
-                    rcv_srvr = recv(i, buff, (sizeof(buff)-1), 0);
-                    // rcv_srvr = recv(i, buff, BUFF_SIZE, 0);
-                    printf("recv: %d\n", rcv_srvr);
+                    rcv_srvr = recv(i, buff, sizeof(buff)-1, 0);
+                    // printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
                         perror("receive");
                         continue;
                     }
                     else if (rcv_srvr > 0) {
-                        buff[rcv_srvr] = '\0';
+                        // buff[rcv_srvr] = '\0';
                         client_list[i].cl_fd = i;
-                        handle_client_data(&client_list[i], buff, &rcv_srvr);
+                        handle_client_data(&client_list[i], buff, rcv_srvr);
                     }
                     else {
                         FD_CLR(i, &master_set);
@@ -186,18 +180,20 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
     return 0;
 }
 
-int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
+int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
+    // printf("len: %ld, recv: %d\n", strlen(client->buff), rcv_srvr);
+
     int working_pos = client->position;
-    
-    memcpy(&client->buff[working_pos], buff, *rcv_srvr-1);
-    client->position += *rcv_srvr-1;
+    memcpy(&client->buff[working_pos], buff, rcv_srvr);
+    client->position += rcv_srvr;
+    // client->buff[client->position] = '\0';
     
     char *content_len;
     char *zero_pos;
     int len = 0;
     int z_pos = 0;
-
-    if ((zero_pos = strstr(client->buff, "\r\n\r\n"))) {        
+    
+    if ((zero_pos = strstr(client->buff, "\r\n\r\n"))) {   
         zero_pos += strlen("\r\n\r\n");        
         z_pos = zero_pos - client->buff;
 
@@ -205,7 +201,7 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
             content_len += strlen("Content-Length:");
             len = atoi(content_len);     
         }   
-
+    
         if ((z_pos + len) == client->position) http_header_parse(client);            
     }
 
@@ -213,7 +209,7 @@ int handle_client_data(Clients *client, char *buff, int *rcv_srvr) {
 }
 
 int http_header_parse(Clients *client) {
-
+    
     // memset(client->buff, 0, sizeof(client->buff));
     // memset(client->method_arr, 0, sizeof(client->method_arr));
     // memset(client->path_arr, 0, sizeof(client->path_arr));
@@ -285,6 +281,7 @@ int http_header_parse(Clients *client) {
 
 int handle_request(Clients *client) {
     // printf("method: %s, path: %s, version: %s, body: %s\n", client->method, client->path, client->version, client->body);
+    
     Response response;
     memset(&response, 0, sizeof(Response));
     
@@ -292,7 +289,7 @@ int handle_request(Clients *client) {
     sqlite3_open("monit_users.db", &sql_db);
     sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT, is_admin INTEGER)", 
                 NULL, NULL, NULL);  
-
+    
     if (strcmp("/health", client->path_arr) == 0) {
         handle_health(client, &response);
     }
