@@ -186,7 +186,7 @@ int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
     int working_pos = client->position;
     memcpy(&client->buff[working_pos], buff, rcv_srvr);
     client->position += rcv_srvr;
-    // client->buff[client->position] = '\0';
+    client->buff[client->position] = '\0';
     
     char *content_len;
     char *zero_pos;
@@ -349,10 +349,40 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
  
     if (strcmp(client->method_arr, "GET") == 0) {
         r->body[0] = '[';
-        sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        r->body[strlen(r->body)-2] = ']';
-        GET_response(client, r);
-  
+
+        char *uuid;
+        if ((uuid = strstr(client->path_arr, "users/"))) {   
+        // if (uuid[0] != '\0') {
+            uuid += strlen("users/");
+
+            char buff_db[BUFF_DB_SIZE];
+            memset(buff_db, 0, sizeof(buff_db));
+            snprintf(buff_db, BUFF_DB_SIZE, "SELECT username, timestamp FROM users WHERE UUID = ('%s')", uuid);
+
+            sqlite3_stmt *ppStmt;
+            sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);  
+
+            if (sqlite3_step(ppStmt) != SQLITE_ROW) {
+                snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
+                snprintf(r->type, sizeof(r->type), "%s", "application/json");
+                snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");   
+                sqlite3_finalize(ppStmt);
+                return 0;
+            }
+            else {
+                const char *username = sqlite3_column_text(ppStmt, 0);
+                const char *timestamp = sqlite3_column_text(ppStmt, 1);
+                snprintf(r->body + strlen(r->body), sizeof(r->body), 
+                        "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
+                        uuid, username, timestamp);     
+            }
+            sqlite3_finalize(ppStmt);
+        }
+        else {
+            sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
+        }  
+            r->body[strlen(r->body)-2] = ']';
+            GET_response(client, r);
     }
     else if (strcmp(client->method_arr, "POST") == 0) {
         db_users(sql_db, client, r);
@@ -379,26 +409,12 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
-    // char *username;
-    // char *password;
-    // char *p = strchr(client->body, ':') + 2;
-    // username = p;    
-    // p = strchr(p, '"');
-    // *p = '\0';  
-    // p = strchr(p+1, ':') + 2;  
-    // password = p;    
-    // p = strchr(p, '"');
-    // *p = '\0';  
-
     char *password = hashing_passwd(client->password, r);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
             out, client->username, password, buff_time, "1");
-
-    // snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp) VALUES ('%s', '%s', '%s', '%s')", 
-    //         out, username, password, buff_time);
 
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
