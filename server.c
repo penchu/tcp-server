@@ -378,11 +378,10 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             }
             sqlite3_finalize(ppStmt);
         }
-        else {
-            sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        }  
-            r->body[strlen(r->body)-2] = ']';
-            GET_response(client, r);
+        else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
+        
+        r->body[strlen(r->body)-2] = ']';
+        GET_response(client, r);
     }
     else if (strcmp(client->method_arr, "POST") == 0) {
         db_users(sql_db, client, r);

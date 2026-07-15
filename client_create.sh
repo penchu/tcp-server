@@ -1,6 +1,6 @@
 #!/bin/bash
 
-timestamp=$(date +%s%N)
+# timestamp=$(date +%s%N)
 
 for i in {1..5}; do
     timestamp=$(date +%s%N)
