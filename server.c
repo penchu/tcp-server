@@ -28,6 +28,8 @@ typedef struct {
     char token_arr[BUFF_SIZE*4];
     char username[BUFF_SIZE];
     char password[BUFF_SIZE];
+    char buff_send[BUFF_SIZE*80];
+    int send_position;
 } Clients;
 
 typedef struct {
@@ -62,9 +64,10 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
 int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
-char *hashing_passwd(char *passwd, Response *r);
+char *hashing_passwd(Clients *client, Response *r);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r);
 int JWT_Token(const char *user_id, int is_admin, Response *r);
+int response_handle(Clients *client, char *status_code, char *body);
 
 int main(void) {
     int sockfd;
@@ -352,7 +355,6 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
         char *uuid;
         if ((uuid = strstr(client->path_arr, "users/"))) {   
-        // if (uuid[0] != '\0') {
             uuid += strlen("users/");
 
             char buff_db[BUFF_DB_SIZE];
@@ -363,9 +365,10 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);  
 
             if (sqlite3_step(ppStmt) != SQLITE_ROW) {
-                snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
-                snprintf(r->type, sizeof(r->type), "%s", "application/json");
-                snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");   
+                // snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
+                // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+                // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");   
+                response_handle(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
                 sqlite3_finalize(ppStmt);
                 return 0;
             }
@@ -408,7 +411,7 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
-    char *password = hashing_passwd(client->password, r);
+    char *password = hashing_passwd(client, r);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
@@ -453,18 +456,20 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
 
     if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        response_handle(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
         jwt_free(jwt);
         return 0;
     }   
 
     if (jwt_get_grant_int(jwt, "adm") != 0) { 
         if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-            snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-            snprintf(r->type, sizeof(r->type), "%s", "application/json");
-            snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+            // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+            // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+            // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+            response_handle(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
             jwt_free(jwt);
             return 0; //probably should make this error message compiling into a separate function
         }
@@ -480,9 +485,10 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     
 
     if (sqlite3_changes(sql_db) == 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
+        response_handle(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
     }
     else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
     
@@ -501,18 +507,20 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
 
     if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+        response_handle(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
         jwt_free(jwt);
         return 0;
     }    
 
     if (jwt_get_grant_int(jwt, "adm") != 0) { 
         if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-            snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized_3");
-            snprintf(r->type, sizeof(r->type), "%s", "application/json");
-            snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+            // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized_3");
+            // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+            // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
+            response_handle(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
             jwt_free(jwt);
             return 0; //probably should make this error message compiling into a separate function
         }
@@ -523,7 +531,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
             }    
             if (client->password[0] != '\0') {
                 memset(buff_db, 0, sizeof(buff_db));
-                char *password = hashing_passwd(client->password, r);
+                char *password = hashing_passwd(client, r);
                 snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
                 sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
             }
@@ -536,31 +544,33 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         }    
         if (client->password[0] != '\0') {
             memset(buff_db, 0, sizeof(buff_db));
-            char *password = hashing_passwd(client->password, r);
+            char *password = hashing_passwd(client, r);
             snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
             sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
         }
     }
    
     if (sqlite3_changes(sql_db) == 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
+        response_handle(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
     }
     else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
     jwt_free(jwt);
     return 0;
 }
 
-char *hashing_passwd(char *passwd, Response *r) {
+char *hashing_passwd(Clients *client, Response *r) {
 
     static char out[crypto_pwhash_STRBYTES];
-    unsigned long long passwdlen = strlen(passwd);
+    unsigned long long passwdlen = strlen(client->password);
 
-    if (crypto_pwhash_str(out, passwd, passwdlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "500 Internal Server Error");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Internal server error\"}\n");      
+    if (crypto_pwhash_str(out, client->password, passwdlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "500 Internal Server Error");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Internal server error\"}\n");   
+        response_handle(client, "500 Internal Server Error", "{\"error\": \"Internal server error\"}\n");   
     }
 
     return out;
@@ -590,9 +600,10 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
     sqlite3_stmt *ppStmt;
     sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);    
     if (sqlite3_step(ppStmt) != SQLITE_ROW) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n");   
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n");  
+        response_handle(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}\n");   
         sqlite3_finalize(ppStmt);
         return 0;
     }
@@ -603,9 +614,10 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
     }   
 
     if (crypto_pwhash_str_verify (hashed_password, client->password, strlen(client->password)) != 0) {
-        snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n"); 
+        // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
+        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Invalid credentials\"}\n"); 
+        response_handle(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}\n");
     }
     else {
         JWT_Token(user_id, is_admin, r);
@@ -638,6 +650,25 @@ int JWT_Token(const char *user_id, int is_admin, Response *r) {
     return 0;
 }
 
+int response_handle(Clients *client, char *status_code, char *body) {
 
+    // char buff_send[BUFF_SIZE*80];
+    // memset(buff_send, 0, sizeof(buff_send));
+    // int position;
+    int *pos = &client->send_position;
+    char *buff_send = client->buff_send;
+    int len = strlen(body); 
+    int sizeof_buff = BUFF_SIZE*80;
+    *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);
+    if (body[0] != '\0') {
+        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");
+        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %d\r\n", len);
+        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
+        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
+    }
+    else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
+
+    return 0;
+}
 
 
