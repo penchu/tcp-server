@@ -66,7 +66,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
 char *hashing_passwd(Clients *client, Response *r);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r);
-int JWT_Token(const char *user_id, int is_admin, Response *r);
+int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r);
 int response_handle(Clients *client, char *status_code, char *body);
 
 int main(void) {
@@ -130,8 +130,7 @@ int server_run(int *sockfd) {
 
     Clients client_list[MAX_CLIENTS];
     
-    while (1) {   
-        // memset(buff, 0, sizeof(buff));     
+    while (1) {     
         fd_set read_set = master_set;
         sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
         if (sel_val < 0) {
@@ -141,19 +140,16 @@ int server_run(int *sockfd) {
         
         for (int i = 0; i <= max_fd; i++) {            
             if (FD_ISSET(i, &read_set)) {
-                // memset(buff, 0, sizeof(buff));
                 if (i == *sockfd) {  
                     handle_new_client(sockfd, &max_fd, &master_set);
                 }
                 else {                    
                     rcv_srvr = recv(i, buff, sizeof(buff)-1, 0);
-                    // printf("recv: %d\n", rcv_srvr);
                     if (rcv_srvr < 0) {
                         perror("receive");
                         continue;
                     }
                     else if (rcv_srvr > 0) {
-                        // buff[rcv_srvr] = '\0';
                         client_list[i].cl_fd = i;
                         handle_client_data(&client_list[i], buff, rcv_srvr);
                     }
@@ -184,8 +180,6 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 }
 
 int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
-    // printf("len: %ld, recv: %d\n", strlen(client->buff), rcv_srvr);
-
     int working_pos = client->position;
     memcpy(&client->buff[working_pos], buff, rcv_srvr);
     client->position += rcv_srvr;
@@ -212,12 +206,6 @@ int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
 }
 
 int http_header_parse(Clients *client) {
-    
-    // memset(client->buff, 0, sizeof(client->buff));
-    // memset(client->method_arr, 0, sizeof(client->method_arr));
-    // memset(client->path_arr, 0, sizeof(client->path_arr));
-    // memset(client->version_arr, 0, sizeof(client->version_arr));
-    // memset(client->token_arr, 0, sizeof(client->token_arr));
 
     char *position;
     int counter = 0;
@@ -273,9 +261,6 @@ int http_header_parse(Clients *client) {
         strncpy(client->password, position, counter);
         client->password[counter] = '\0';
     }
-    // printf("token: %s\n", client->token_arr);
-    // printf("method: %s, path: %s, version: %s\n token: %s\n username: %s, password: %s\n", 
-    //         client->method_arr, client->path_arr, client->version_arr, client->token_arr, client->username, client->password);
      
     handle_request(client);
     
@@ -306,19 +291,19 @@ int handle_request(Clients *client) {
         handle_login(sql_db, client, &response);
     }
     
-    char buff_send[BUFF_SIZE*80];
-    memset(buff_send, 0, sizeof(buff_send));
-    int position;
-    int len = strlen(response.body);
-    position = snprintf(buff_send, sizeof(buff_send), "HTTP/1.1 %s\r\n", response.status_code);
-    if (response.body[0] != '\0') {
-        position += snprintf(buff_send + position, sizeof(buff_send), "Content-Type: %s\r\n", response.type);
-        position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", len);
-        position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-        position += snprintf(buff_send + position, sizeof(buff_send), "%s", response.body);
-    }
-    else position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
-    send(client->cl_fd, buff_send, position, 0);
+    // char buff_send[BUFF_SIZE*80];
+    // memset(buff_send, 0, sizeof(buff_send));
+    // int position;
+    // int len = strlen(response.body);
+    // position = snprintf(buff_send, sizeof(buff_send), "HTTP/1.1 %s\r\n", response.status_code);
+    // if (response.body[0] != '\0') {
+    //     position += snprintf(buff_send + position, sizeof(buff_send), "Content-Type: %s\r\n", response.type);
+    //     position += snprintf(buff_send + position, sizeof(buff_send), "Content-Length: %d\r\n", len);
+    //     position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
+    //     position += snprintf(buff_send + position, sizeof(buff_send), "%s", response.body);
+    // }
+    // else position += snprintf(buff_send + position, sizeof(buff_send), "%s", "\r\n");
+    send(client->cl_fd, client->buff_send, client->send_position, 0);
         
     sqlite3_close(sql_db);
 
@@ -328,9 +313,11 @@ int handle_request(Clients *client) {
 int handle_health(Clients *client, Response *r) {
     server.requests++;
 
-    snprintf(r->body, sizeof(r->body), "%s", "{\"status\": \"ok\"}\n");
-    snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
-    snprintf(r->type, sizeof(r->type), "%s", "application/json");
+    // snprintf(r->body, sizeof(r->body), "%s", "{\"status\": \"ok\"}\n");
+    // snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
+    // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+
+    response_handle(client, "200 OK", "{\"status\": \"ok\"}\n");
 
     return 0;
 }
@@ -340,9 +327,13 @@ int handle_metrics(Clients *client, Response *r) {
     time_t now_2 = time(NULL);
     int time_diff = difftime(now_2, server.now);
 
-    snprintf(r->body, sizeof(r->body), "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
-    snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
-    snprintf(r->type, sizeof(r->type), "%s", "application/json");
+    // snprintf(r->body, sizeof(r->body), "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
+    // snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
+    // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+
+    char uptime[BUFF_SIZE];
+    snprintf(uptime, BUFF_SIZE, "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
+    response_handle(client, "200 OK", uptime);
 
     return 0;
 }
@@ -351,10 +342,15 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
  
     if (strcmp(client->method_arr, "GET") == 0) {
-        r->body[0] = '[';
+
+        char GET_body[BUFF_SIZE*80];
+        memset(GET_body, 0, sizeof(GET_body));
+        GET_body[0] = '[';
+
+        // r->body[0] = '[';
 
         char *uuid;
-        if ((uuid = strstr(client->path_arr, "users/"))) {   
+        if ((uuid = strstr(client->path_arr, "users/"))) {  
             uuid += strlen("users/");
 
             char buff_db[BUFF_DB_SIZE];
@@ -375,16 +371,18 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             else {
                 const char *username = sqlite3_column_text(ppStmt, 0);
                 const char *timestamp = sqlite3_column_text(ppStmt, 1);
-                snprintf(r->body + strlen(r->body), sizeof(r->body), 
+                snprintf(GET_body + strlen(GET_body), BUFF_SIZE*80, 
                         "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
                         uuid, username, timestamp);     
             }
             sqlite3_finalize(ppStmt);
         }
-        else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        
-        r->body[strlen(r->body)-2] = ']';
-        GET_response(client, r);
+        else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)GET_body, NULL);
+        // r->body[strlen(r->body)-2] = ']';
+        GET_body[strlen(GET_body)-2] = ']';
+        // GET_response(client, r);
+        response_handle(client, "200 OK", GET_body);
+
     }
     else if (strcmp(client->method_arr, "POST") == 0) {
         db_users(sql_db, client, r);
@@ -420,9 +418,15 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
-    snprintf(r->status_code, sizeof(r->status_code), "%s", "201 Created");
-    snprintf(r->type, sizeof(r->type), "%s", "application/json");  
-    snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\"}\n", out);
+    // snprintf(r->status_code, sizeof(r->status_code), "%s", "201 Created");
+    // snprintf(r->type, sizeof(r->type), "%s", "application/json");  
+    // snprintf(r->body, sizeof(r->body), "{\"uuid\":\"%s\"}\n", out);
+
+    char db_body[BUFF_SIZE];
+    memset(db_body, 0, BUFF_SIZE);
+    snprintf(db_body, BUFF_SIZE, "{\"uuid\":\"%s\"}\n", out);
+
+    response_handle(client, "201 Created", db_body);
 
     return 0;
 }
@@ -430,10 +434,12 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names) {
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
 
-    Response *r = (Response *)callback_data;
-    snprintf(r->body + strlen(r->body), sizeof(r->body), 
+    char *GET_body = (char *)callback_data;
+    size_t len = strlen(GET_body);
+     //claude is suggesting to use different local structs, but will proceed with it later, when make it work with the array passing
+    snprintf(GET_body + len, BUFF_SIZE*80 - len, 
              "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
-             values[0], values[1], values[3]);
+             values[0], values[1], values[3]); // should change the strlen approach as it is 0(n) and it would make everything slower with more users
 
     return 0;
 }
@@ -556,7 +562,8 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");
         response_handle(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
     }
-    else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
+    // else snprintf(r->status_code, sizeof(r->status_code), "%s", "204 No Content");
+    else response_handle(client, "204 No Content", NULL);
     jwt_free(jwt);
     return 0;
 }
@@ -620,14 +627,14 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
         response_handle(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}\n");
     }
     else {
-        JWT_Token(user_id, is_admin, r);
+        JWT_Token(client, user_id, is_admin, r);
     }
 
     sqlite3_finalize(ppStmt);
     return 0;
 }
 
-int JWT_Token(const char *user_id, int is_admin, Response *r) {
+int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r) {
 
     const char *jwt_key = getenv("JWT_SECRET");
     // printf("secret: %s\n", jwt_key);
@@ -642,9 +649,15 @@ int JWT_Token(const char *user_id, int is_admin, Response *r) {
     jwt_add_grant_int(jwt, "adm", is_admin); //adding the value here
     char *signed_token_str = jwt_encode_str(jwt);
 
-    snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
-    snprintf(r->type, sizeof(r->type), "%s", "application/json");
-    snprintf(r->body, sizeof(r->body), "{\"token\": \"%s\"}\n", signed_token_str);
+    // snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
+    // snprintf(r->type, sizeof(r->type), "%s", "application/json");
+    // snprintf(r->body, sizeof(r->body), "{\"token\": \"%s\"}\n", signed_token_str);
+
+    char jwt_body[BUFF_SIZE];
+    memset(jwt_body, 0, BUFF_SIZE);
+    snprintf(jwt_body, BUFF_SIZE, "{\"token\": \"%s\"}\n", signed_token_str);
+
+    response_handle(client, "200 OK", NULL);
     
     jwt_free(jwt);
     return 0;
@@ -657,12 +670,12 @@ int response_handle(Clients *client, char *status_code, char *body) {
     // int position;
     int *pos = &client->send_position;
     char *buff_send = client->buff_send;
-    int len = strlen(body); 
+    size_t len = strlen(body); 
     int sizeof_buff = BUFF_SIZE*80;
     *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);
     if (body[0] != '\0') {
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");
-        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %d\r\n", len);
+        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %ld\r\n", len);
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
     }
