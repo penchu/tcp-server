@@ -1,5 +1,7 @@
 #!/bin/bash
 
+curl -H 'Content-Type: application/json' -d '{ "username":"penchu_test", "password":"abcd" }' -X POST http://localhost:8080/users
+
 TOKEN=$(curl -s -X POST http://localhost:8080/login -H 'Content-Type: application/json' -d '{"username":"penchu_test","password":"abcd"}' | jq -r '.token')
 
 UUID=$(curl -s http://localhost:8080/users | jq -r '.[]|select(.username=="penchu_test")|.uuid')
