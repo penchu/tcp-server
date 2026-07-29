@@ -28,7 +28,6 @@ typedef struct {
     char token_arr[BUFF_SIZE*4];
     char username[BUFF_SIZE];
     char password[BUFF_SIZE];
-    char buff_send[BUFF_SIZE*80];
     int send_position;
 } Clients;
 
@@ -46,6 +45,7 @@ typedef struct {
     char status_code[BUFF_SIZE];
     char body[BUFF_SIZE*80];
     char type[BUFF_SIZE];
+    int pos_body;
 } Response;
 
 Server server;
@@ -346,6 +346,7 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
         char GET_body[BUFF_SIZE*80];
         memset(GET_body, 0, sizeof(GET_body));
         GET_body[0] = '[';
+        r->pos_body++;
 
         // r->body[0] = '[';
 
@@ -377,8 +378,9 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             }
             sqlite3_finalize(ppStmt);
         }
-        else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)GET_body, NULL);
+        else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
         // r->body[strlen(r->body)-2] = ']';
+        strncpy(GET_body, r->body, r->pos_body);
         GET_body[strlen(GET_body)-2] = ']';
         // GET_response(client, r);
         write_response(client, "200 OK", GET_body);
@@ -434,10 +436,10 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names) {
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
 
-    char *GET_body = (char *)callback_data;
-    size_t len = strlen(GET_body);
-     //claude is suggesting to use different local structs, but will proceed with it later, when make it work with the array passing
-    snprintf(GET_body + len, BUFF_SIZE*80 - len, 
+    // char *GET_body = (char *)callback_data;
+    Response *r = (Response *)callback_data;
+    // size_t len = strlen(GET_body);
+    r->pos_body = snprintf(r->body + r->pos_body, BUFF_SIZE*80 - r->pos_body, 
              "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
              values[0], values[1], values[3]); // should change the strlen approach as it is 0(n) and it would make everything slower with more users
 
@@ -666,27 +668,23 @@ int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r) {
 
 int write_response(Clients *client, char *status_code, char *body) {
 
-    // char buff_send[BUFF_SIZE*80];
-    // memset(buff_send, 0, sizeof(buff_send));
     // int position;
     int *pos = &client->send_position;
     int sizeof_buff = BUFF_SIZE*80;
     char buff_send[sizeof_buff];
-    // size_t len = strlen(body); 
     
     *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);
     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");
     // printf("body: %s\n", body);
     if (body != NULL) {
         size_t len = strlen(body); 
-        // *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %ld\r\n", len);
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
     }
     else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
 
-    send(client->cl_fd, client->buff_send, client->send_position, 0);
+    send(client->cl_fd, buff_send, client->send_position, 0);
 
     return 0;
 }
