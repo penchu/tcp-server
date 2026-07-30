@@ -340,15 +340,11 @@ int handle_metrics(Clients *client, Response *r) {
 
 int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
- 
+    
     if (strcmp(client->method_arr, "GET") == 0) {
 
-        char GET_body[BUFF_SIZE*80];
-        memset(GET_body, 0, sizeof(GET_body));
-        GET_body[0] = '[';
+        r->body[0] = '[';
         r->pos_body++;
-
-        // r->body[0] = '[';
 
         char *uuid;
         if ((uuid = strstr(client->path_arr, "users/"))) {  
@@ -372,18 +368,16 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             else {
                 const char *username = sqlite3_column_text(ppStmt, 0);
                 const char *timestamp = sqlite3_column_text(ppStmt, 1);
-                snprintf(GET_body + strlen(GET_body), BUFF_SIZE*80, 
+                snprintf(r->body + strlen(r->body), BUFF_SIZE*80, 
                         "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
                         uuid, username, timestamp);     
             }
             sqlite3_finalize(ppStmt);
         }
         else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        // r->body[strlen(r->body)-2] = ']';
-        strncpy(GET_body, r->body, r->pos_body);
-        GET_body[strlen(GET_body)-2] = ']';
-        // GET_response(client, r);
-        write_response(client, "200 OK", GET_body);
+        r->body[strlen(r->body)-2] = ']';
+        
+        write_response(client, "200 OK", r->body);
 
     }
     else if (strcmp(client->method_arr, "POST") == 0) {
@@ -435,13 +429,12 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
 
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names) {
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
-
-    // char *GET_body = (char *)callback_data;
+    
     Response *r = (Response *)callback_data;
-    // size_t len = strlen(GET_body);
-    r->pos_body = snprintf(r->body + r->pos_body, BUFF_SIZE*80 - r->pos_body, 
+    
+    r->pos_body += snprintf(r->body + r->pos_body, BUFF_SIZE*80 - r->pos_body, 
              "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
-             values[0], values[1], values[3]); // should change the strlen approach as it is 0(n) and it would make everything slower with more users
+             values[0], values[1], values[3]); 
 
     return 0;
 }
@@ -674,8 +667,7 @@ int write_response(Clients *client, char *status_code, char *body) {
     char buff_send[sizeof_buff];
     
     *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);
-    *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");
-    // printf("body: %s\n", body);
+    *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");    
     if (body != NULL) {
         size_t len = strlen(body); 
         *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %ld\r\n", len);
