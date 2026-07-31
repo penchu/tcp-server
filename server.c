@@ -661,22 +661,46 @@ int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r) {
 
 int write_response(Clients *client, char *status_code, char *body) {
 
-    // int position;
-    int *pos = &client->send_position;
-    int sizeof_buff = BUFF_SIZE*80;
-    char buff_send[sizeof_buff];
-    
-    *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);
-    *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: %s\r\n", "application/json");    
-    if (body != NULL) {
-        size_t len = strlen(body); 
-        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %ld\r\n", len);
-        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
-        *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
-    }
-    else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
+    // int *pos = &client->send_position;
 
-    send(client->cl_fd, buff_send, client->send_position, 0);
+    int pos = 0;
+    int mem_alloc = 1;
+    char *buff_send;    
+
+    if (body != NULL) {
+        size_t len = strlen(body);
+
+        mem_alloc += snprintf(NULL, 0, "HTTP/1.1 %s\r\n", status_code);
+        mem_alloc += snprintf(NULL, 0, "Content-Length: %ld\r\n\r\n", len);
+        mem_alloc += len + strlen("Content-Type: application/json\r\n");
+
+        buff_send = malloc(mem_alloc);
+
+        pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n", status_code);
+        pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Type: application/json\r\n");
+        pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Length: %ld\r\n\r\n", len);
+        pos += snprintf(buff_send + pos, mem_alloc - pos, "%s", body);
+    }
+    else {
+        mem_alloc += snprintf(NULL, 0, "HTTP/1.1 %s\r\n", status_code);
+        pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n\r\n", status_code);
+    }
+    
+    // *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);        
+    // if (body != NULL) {
+    //     size_t len = strlen(body); 
+    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: application/json\r\n");
+    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %ld\r\n", len);
+    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
+    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
+    // }
+    // else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
+
+    // printf("body: %s\n", buff_send);
+    printf("pos: %d, mem: %d\n", pos, mem_alloc);
+    int return_value = send(client->cl_fd, buff_send, pos, 0);
+    printf("ret: %d\n", return_value);
+    free(buff_send);
 
     return 0;
 }
