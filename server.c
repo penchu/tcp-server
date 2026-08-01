@@ -43,9 +43,11 @@ typedef struct {
 
 typedef struct {
     char status_code[BUFF_SIZE];
-    char body[BUFF_SIZE*80];
+    // char body[BUFF_SIZE*80];
+    char *body;
     char type[BUFF_SIZE];
     int pos_body;
+    int capacity;
 } Response;
 
 Server server;
@@ -306,6 +308,7 @@ int handle_request(Clients *client) {
     // send(client->cl_fd, client->buff_send, client->send_position, 0);
         
     sqlite3_close(sql_db);
+    free(response.body);
 
     return 0;
 }
@@ -342,7 +345,8 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
     
     if (strcmp(client->method_arr, "GET") == 0) {
-
+        r->body = malloc(BUFF_DB_SIZE);
+        r->capacity += BUFF_DB_SIZE;
         r->body[0] = '[';
         r->pos_body++;
 
@@ -368,7 +372,7 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             else {
                 const char *username = sqlite3_column_text(ppStmt, 0);
                 const char *timestamp = sqlite3_column_text(ppStmt, 1);
-                snprintf(r->body + strlen(r->body), BUFF_SIZE*80, 
+                snprintf(r->body + strlen(r->body), BUFF_DB_SIZE, 
                         "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
                         uuid, username, timestamp);     
             }
@@ -431,9 +435,24 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
     
     Response *r = (Response *)callback_data;
-    
+
+    int mem_body = snprintf(NULL, 0, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", values[0], values[1], values[3]);
+
+    if (mem_body > r->capacity) {
+        char *buff = realloc(r->body, r->capacity + BUFF_DB_SIZE);
+        if (buff == NULL) {
+            // printf("Failed. Unable to resize memory"); // should add some error handling here
+            write_response("500 Internal Server Error", "Internal server error");
+            return 0;
+        }
+        else {
+            r->body = buff;
+            r->capacity += BUFF_DB_SIZE;
+        }
+    }
+
     r->pos_body += snprintf(r->body + r->pos_body, BUFF_SIZE*80 - r->pos_body, 
-             "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
+             "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
              values[0], values[1], values[3]); 
 
     return 0;
@@ -633,7 +652,6 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r) {
 int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r) {
 
     const char *jwt_key = getenv("JWT_SECRET");
-    // printf("secret: %s\n", jwt_key);
 
     jwt_t *jwt;
     jwt_new(&jwt); 	
@@ -695,11 +713,8 @@ int write_response(Clients *client, char *status_code, char *body) {
     //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
     // }
     // else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
-
-    // printf("body: %s\n", buff_send);
-    printf("pos: %d, mem: %d\n", pos, mem_alloc);
+    
     int return_value = send(client->cl_fd, buff_send, pos, 0);
-    printf("ret: %d\n", return_value);
     free(buff_send);
 
     return 0;
