@@ -43,11 +43,11 @@ typedef struct {
 
 typedef struct {
     char status_code[BUFF_SIZE];
-    // char body[BUFF_SIZE*80];
     char *body;
     char type[BUFF_SIZE];
     int pos_body;
     int capacity;
+    int error;
 } Response;
 
 Server server;
@@ -380,8 +380,9 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
         }
         else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
         r->body[strlen(r->body)-2] = ']';
-        
-        write_response(client, "200 OK", r->body);
+
+        if (r->error == 0) write_response(client, "200 OK", r->body);
+        else write_response(client, "500 Internal Server Error", "Internal server error");
 
     }
     else if (strcmp(client->method_arr, "POST") == 0) {
@@ -435,14 +436,14 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     // printf("values: %s, %s, %s\n", values[0], values[1], values[2]);
     
     Response *r = (Response *)callback_data;
+    r->error = 0;
 
     int mem_body = snprintf(NULL, 0, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", values[0], values[1], values[3]);
 
     if (mem_body > r->capacity) {
         char *buff = realloc(r->body, r->capacity + BUFF_DB_SIZE);
-        if (buff == NULL) {
-            // printf("Failed. Unable to resize memory"); // should add some error handling here
-            write_response("500 Internal Server Error", "Internal server error");
+        if (buff == NULL) {   
+            r->error = 1;
             return 0;
         }
         else {
