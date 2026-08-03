@@ -20,7 +20,8 @@
 
 typedef struct {
     int cl_fd;
-    char buff[BUFF_SIZE*5];
+    // char buff[BUFF_SIZE*5];
+    char *buff;
     int position;
     char method_arr[BUFF_SIZE];
     char path_arr[BUFF_SIZE];
@@ -183,6 +184,21 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 
 int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
     int working_pos = client->position;
+
+    if (client->buff == NULL) {
+        client->buff = malloc(rcv_srvr+1);
+    }
+    else {
+        char *buff = realloc(client->buff, client->position+rcv_srvr);
+        if (buff == NULL) {   
+            write_response(client, "500 Internal Server Error", "Internal server error");
+            return 0;
+        }
+        else {
+            client->buff = buff;
+        }
+    }    
+
     memcpy(&client->buff[working_pos], buff, rcv_srvr);
     client->position += rcv_srvr;
     client->buff[client->position] = '\0';
