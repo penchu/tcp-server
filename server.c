@@ -183,23 +183,23 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 }
 
 int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
-    int working_pos = client->position;
+    // int working_pos = client->position;
 
     if (client->buff == NULL) {
         client->buff = malloc(rcv_srvr+1);
     }
     else {
-        char *buff = realloc(client->buff, client->position+rcv_srvr);
-        if (buff == NULL) {   
+        char *buff_temp = realloc(client->buff, client->position+rcv_srvr+1);
+        if (buff_temp == NULL) {   
             write_response(client, "500 Internal Server Error", "Internal server error");
             return 0;
         }
         else {
-            client->buff = buff;
+            client->buff = buff_temp;
         }
     }    
 
-    memcpy(&client->buff[working_pos], buff, rcv_srvr);
+    memcpy(&client->buff[client->position], buff, rcv_srvr);
     client->position += rcv_srvr;
     client->buff[client->position] = '\0';
     
@@ -280,6 +280,7 @@ int http_header_parse(Clients *client) {
         client->password[counter] = '\0';
     }
      
+    free(client->buff);
     handle_request(client);
     
     return 0;
@@ -361,7 +362,7 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
     server.requests++;
     
     if (strcmp(client->method_arr, "GET") == 0) {
-        r->body = malloc(BUFF_DB_SIZE);
+        r->body = malloc(BUFF_DB_SIZE+1);
         r->capacity += BUFF_DB_SIZE;
         r->body[0] = '[';
         r->pos_body++;
@@ -456,19 +457,22 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
 
     int mem_body = snprintf(NULL, 0, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", values[0], values[1], values[3]);
 
-    if (mem_body > r->capacity) {
-        char *buff = realloc(r->body, r->capacity + BUFF_DB_SIZE);
+    if (mem_body + r->pos_body > r->capacity) {
+        printf("test1\n");
+        char *buff = realloc(r->body, r->capacity + mem_body + 1);
         if (buff == NULL) {   
             r->error = 1;
             return 0;
         }
         else {
+            printf("test2\n");
             r->body = buff;
-            r->capacity += BUFF_DB_SIZE;
+            r->capacity += mem_body;
+            r->body[r->capacity] = '\0'; // not sure about that
         }
     }
-
-    r->pos_body += snprintf(r->body + r->pos_body, BUFF_SIZE*80 - r->pos_body, 
+    printf("pos_body: %d, capacity: %d, mem_body: %d\n", r->pos_body, r->capacity, mem_body);
+    r->pos_body += snprintf(r->body + r->pos_body, r->capacity - r->pos_body, 
              "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
              values[0], values[1], values[3]); 
 
