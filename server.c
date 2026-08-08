@@ -132,6 +132,10 @@ int server_run(int *sockfd) {
     int rcv_srvr;    
 
     Clients client_list[MAX_CLIENTS];
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        client_list[i].buff = NULL;
+        client_list[i].position = 0;
+    }
     
     while (1) {     
         fd_set read_set = master_set;
@@ -186,7 +190,7 @@ int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
     // int working_pos = client->position;
 
     if (client->buff == NULL) {
-        client->buff = malloc(rcv_srvr+1);
+        client->buff = malloc(rcv_srvr+1); // an error check should be added 
     }
     else {
         char *buff_temp = realloc(client->buff, client->position+rcv_srvr+1);
@@ -458,20 +462,20 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     int mem_body = snprintf(NULL, 0, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", values[0], values[1], values[3]);
 
     if (mem_body + r->pos_body > r->capacity) {
-        printf("test1\n");
+        // printf("test1\n");
         char *buff = realloc(r->body, r->capacity + mem_body + 1);
         if (buff == NULL) {   
             r->error = 1;
             return 0;
         }
         else {
-            printf("test2\n");
+            // printf("test2\n");
             r->body = buff;
             r->capacity += mem_body;
             r->body[r->capacity] = '\0'; // not sure about that
         }
     }
-    printf("pos_body: %d, capacity: %d, mem_body: %d\n", r->pos_body, r->capacity, mem_body);
+    // printf("pos_body: %d, capacity: %d, mem_body: %d\n", r->pos_body, r->capacity, mem_body);
     r->pos_body += snprintf(r->body + r->pos_body, r->capacity - r->pos_body, 
              "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
              values[0], values[1], values[3]); 
@@ -700,8 +704,6 @@ int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r) {
 
 int write_response(Clients *client, char *status_code, char *body) {
 
-    // int *pos = &client->send_position;
-
     int pos = 0;
     int mem_alloc = 1;
     char *buff_send;    
@@ -721,7 +723,8 @@ int write_response(Clients *client, char *status_code, char *body) {
         pos += snprintf(buff_send + pos, mem_alloc - pos, "%s", body);
     }
     else {
-        mem_alloc += snprintf(NULL, 0, "HTTP/1.1 %s\r\n", status_code);
+        mem_alloc += snprintf(NULL, 0, "HTTP/1.1 %s\r\n\r\n", status_code);
+        buff_send = malloc(mem_alloc);
         pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n\r\n", status_code);
     }
     
@@ -735,7 +738,7 @@ int write_response(Clients *client, char *status_code, char *body) {
     // }
     // else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
     
-    int return_value = send(client->cl_fd, buff_send, pos, 0);
+    send(client->cl_fd, buff_send, pos, 0);
     free(buff_send);
 
     return 0;
