@@ -393,8 +393,7 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r) {
             else {
                 const char *username = sqlite3_column_text(ppStmt, 0);
                 const char *timestamp = sqlite3_column_text(ppStmt, 1);
-                snprintf(r->body + strlen(r->body), BUFF_DB_SIZE, 
-                        "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
+                snprintf(r->body, r->capacity, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
                         uuid, username, timestamp);     
             }
             sqlite3_finalize(ppStmt);
@@ -462,20 +461,18 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
     int mem_body = snprintf(NULL, 0, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", values[0], values[1], values[3]);
 
     if (mem_body + r->pos_body > r->capacity) {
-        // printf("test1\n");
         char *buff = realloc(r->body, r->capacity + mem_body + 1);
         if (buff == NULL) {   
             r->error = 1;
             return 0;
         }
         else {
-            // printf("test2\n");
             r->body = buff;
             r->capacity += mem_body;
             r->body[r->capacity] = '\0'; // not sure about that
         }
     }
-    // printf("pos_body: %d, capacity: %d, mem_body: %d\n", r->pos_body, r->capacity, mem_body);
+
     r->pos_body += snprintf(r->body + r->pos_body, r->capacity - r->pos_body, 
              "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n", 
              values[0], values[1], values[3]); 
