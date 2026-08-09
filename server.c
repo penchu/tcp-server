@@ -16,19 +16,19 @@
 #define MAX_CLIENTS 10
 #define BUFF_SIZE 128
 #define BUFF_DB_SIZE 512
+#define MIN_SIZE 16
 
 
 typedef struct {
     int cl_fd;
-    // char buff[BUFF_SIZE*5];
     char *buff;
     int position;
-    char method_arr[BUFF_SIZE];
-    char path_arr[BUFF_SIZE];
-    char version_arr[BUFF_SIZE];
+    char method_arr[MIN_SIZE];
+    char path_arr[BUFF_SIZE]*2;
+    char version_arr[MIN_SIZE];
     char token_arr[BUFF_SIZE*4];
-    char username[BUFF_SIZE];
-    char password[BUFF_SIZE];
+    char username[BUFF_SIZE/2];
+    char password[BUFF_SIZE*2];
     int send_position;
 } Clients;
 
@@ -67,7 +67,7 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
 int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r);
-char *hashing_passwd(Clients *client, Response *r);
+char *hashing_passwd(Clients *client, char *passwd);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r);
 int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r);
 int write_response(Clients *client, char *status_code, char *body);
@@ -280,8 +280,10 @@ int http_header_parse(Clients *client) {
         while (*(position + counter) != '\"') {
             counter++;
         }
-        strncpy(client->password, position, counter);
-        client->password[counter] = '\0';
+        char temp_pass[BUFF_SIZE*2];
+        strncpy(temp_pass, position, counter);
+        temp_pass[counter] = '\0';
+        client->password = hashing_passwd(temp_pass);        
     }
      
     free(client->buff);
@@ -430,12 +432,12 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r) {
     struct tm *t = localtime(&now);
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
-    char *password = hashing_passwd(client, r);
+    // char *password = hashing_passwd(client);
 
     char buff_db[BUFF_DB_SIZE];
     memset(buff_db, 0, sizeof(buff_db));
     snprintf(buff_db, BUFF_DB_SIZE, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%s')", 
-            out, client->username, password, buff_time, "1");
+            out, client->username, client->password, buff_time, "0");
 
     sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
 
@@ -550,22 +552,16 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
 
     if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
-        // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized");
-        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
         write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
         jwt_free(jwt);
         return 0;
     }    
 
-    if (jwt_get_grant_int(jwt, "adm") != 0) { 
+    if (jwt_get_grant_int(jwt, "adm") == 0) { 
         if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-            // snprintf(r->status_code, sizeof(r->status_code), "%s", "401 Unauthorized_3");
-            // snprintf(r->type, sizeof(r->type), "%s", "application/json");
-            // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Unauthorized\"}\n");
             write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
             jwt_free(jwt);
-            return 0; //probably should make this error message compiling into a separate function
+            return 0; 
         }
         else {
             if (client->username[0] != '\0') {
@@ -574,7 +570,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
             }    
             if (client->password[0] != '\0') {
                 memset(buff_db, 0, sizeof(buff_db));
-                char *password = hashing_passwd(client, r);
+                char *password = hashing_passwd(client);
                 snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
                 sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
             }
@@ -587,7 +583,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
         }    
         if (client->password[0] != '\0') {
             memset(buff_db, 0, sizeof(buff_db));
-            char *password = hashing_passwd(client, r);
+            char *password = hashing_passwd(client);
             snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
             sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
         }
@@ -605,15 +601,12 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r) {
     return 0;
 }
 
-char *hashing_passwd(Clients *client, Response *r) {
+char *hashing_passwd(Clients *client, char *passwd) {
 
     static char out[crypto_pwhash_STRBYTES];
-    unsigned long long passwdlen = strlen(client->password);
+    unsigned long long passwdlen = strlen(passwd);
 
-    if (crypto_pwhash_str(out, client->password, passwdlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        // snprintf(r->status_code, sizeof(r->status_code), "%s", "500 Internal Server Error");
-        // snprintf(r->type, sizeof(r->type), "%s", "application/json");
-        // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"Internal server error\"}\n");   
+    if (crypto_pwhash_str(out, passwd, passwdlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
         write_response(client, "500 Internal Server Error", "{\"error\": \"Internal server error\"}\n");   
     }
 
