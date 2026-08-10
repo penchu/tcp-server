@@ -65,7 +65,6 @@ int handle_metrics(Clients *client, Response *r);
 int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass);
 int db_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass);
 int callback_func(void *callback_data, int num_columns, char** values, char** col_names);
-int GET_response(Clients *client, Response *r);
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r);
 int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass);
 char *hashing_passwd(Clients *client, char *pass);
@@ -188,7 +187,6 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
 }
 
 int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
-    // int working_pos = client->position;
 
     if (client->buff == NULL) {
         client->buff = malloc(rcv_srvr+1); // an error check should be added 
@@ -328,10 +326,6 @@ int handle_request(Clients *client, char *pass) {
 int handle_health(Clients *client, Response *r) {
     server.requests++;
 
-    // snprintf(r->body, sizeof(r->body), "%s", "{\"status\": \"ok\"}\n");
-    // snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
-    // snprintf(r->type, sizeof(r->type), "%s", "application/json");
-
     write_response(client, "200 OK", "{\"status\": \"ok\"}\n");
 
     return 0;
@@ -341,10 +335,6 @@ int handle_metrics(Clients *client, Response *r) {
     server.requests++;
     time_t now_2 = time(NULL);
     int time_diff = difftime(now_2, server.now);
-
-    // snprintf(r->body, sizeof(r->body), "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
-    // snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
-    // snprintf(r->type, sizeof(r->type), "%s", "application/json");
 
     char uptime[BUFF_SIZE];
     snprintf(uptime, BUFF_SIZE, "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
@@ -357,7 +347,8 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     server.requests++;
     
     if (strcmp(client->method_arr, "GET") == 0) {
-        r->body = malloc(BUFF_DB_SIZE+1);
+        r->body = calloc(BUFF_DB_SIZE+1, 1);
+
         r->capacity += BUFF_DB_SIZE;
         r->body[0] = '[';
         r->pos_body++;
@@ -373,10 +364,7 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             sqlite3_stmt *ppStmt;
             sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);  
 
-            if (sqlite3_step(ppStmt) != SQLITE_ROW) {
-                // snprintf(r->status_code, sizeof(r->status_code), "%s", "404 Not Found");
-                // snprintf(r->type, sizeof(r->type), "%s", "application/json");
-                // snprintf(r->body, sizeof(r->body), "%s", "{\"error\": \"User not found\"}\n");   
+            if (sqlite3_step(ppStmt) != SQLITE_ROW) { 
                 write_response(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
                 sqlite3_finalize(ppStmt);
                 return 0;
@@ -390,7 +378,9 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             sqlite3_finalize(ppStmt);
         }
         else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        r->body[strlen(r->body)-2] = ']';
+
+        if (r->body[1] != '\0') r->body[strlen(r->body)-2] = ']';
+        else r->body[0] = '\0';
 
         if (r->error == 0) write_response(client, "200 OK", r->body);
         else write_response(client, "500 Internal Server Error", "Internal server error");
@@ -465,14 +455,6 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
              values[0], values[1], values[3]); 
 
     return 0;
-}
-
-int GET_response(Clients *client, Response *r) {    
-    
-    snprintf(r->status_code, sizeof(r->status_code), "%s", "200 OK");
-    snprintf(r->type, sizeof(r->type), "%s", "application/json");  
-
-    return 0;    
 }
 
 int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {   
@@ -667,16 +649,6 @@ int write_response(Clients *client, char *status_code, char *body) {
         buff_send = malloc(mem_alloc);
         pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n\r\n", status_code);
     }
-    
-    // *pos = snprintf(buff_send, sizeof_buff - *pos, "HTTP/1.1 %s\r\n", status_code);        
-    // if (body != NULL) {
-    //     size_t len = strlen(body); 
-    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Type: application/json\r\n");
-    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "Content-Length: %ld\r\n", len);
-    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
-    //     *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", body);
-    // }
-    // else *pos += snprintf(buff_send + *pos, sizeof_buff - *pos, "%s", "\r\n");
     
     send(client->cl_fd, buff_send, pos, 0);
     free(buff_send);
