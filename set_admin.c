@@ -20,11 +20,13 @@ int main(void) {
     strftime(buff_time, sizeof(buff_time), "%d-%m-%Y %H:%M:%S", t);
 
     sqlite3 *sql_db;
-    sqlite3_open("monit_users.db", &sql_db);
+    // sqlite3_open("monit_users.db", &sql_db);
+    // sqlite3_exec(sql_db, "CREATE TABLE IF NOT EXISTS users (UUID TEXT PRIMARY KEY, username TEXT UNIQUE, password TEXT, timestamp TEXT, is_admin INTEGER)", 
+    //         NULL, NULL, NULL); 
 
     char *username = "admin";
     char *password = "admin";
-    int is_admin = 0;
+    int is_admin = 1;
 
     static char passwrd_hash[crypto_pwhash_STRBYTES];
     unsigned long long passwdlen = strlen(password);
@@ -35,11 +37,11 @@ int main(void) {
 
     char buff_db[512];
     memset(buff_db, 0, sizeof(buff_db));
-    snprintf(buff_db, 512, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%d')", 
-            out, username, passwrd_hash, buff_time, is_admin);
-    if (sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL) !=0) {
-        fprintf(stderr, "%s\n", sqlite3_errmsg(sql_db));
-    }
+    // snprintf(buff_db, 512, "INSERT INTO users (UUID, username, password, timestamp, is_admin) VALUES ('%s', '%s', '%s', '%s', '%d')", 
+    //         out, username, passwrd_hash, buff_time, is_admin);
+    // if (sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL) !=0) {
+    //     fprintf(stderr, "%s\n", sqlite3_errmsg(sql_db));
+    // }
     
 
     return 0;
