@@ -378,9 +378,24 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             sqlite3_finalize(ppStmt);
         }
         else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
+        
+        
+        if (r->body[1] != '\0') {
+            r->pos_body = r->pos_body - 2;
+            r->body[r->pos_body] = ']';
+            // r->body[r->pos_body-1] = '\n';            
+        }
+        else {
+            r->body[1] = ']';
+            r->pos_body++;
+            // r->body[2] = '\n';
+        }
 
-        if (r->body[1] != '\0') r->body[strlen(r->body)-2] = ']';
-        else r->body[0] = '\0';
+        // for (int i = 0; r->body[i] != '\0'; i++) {
+        //     printf("%02x ", r->body[i]);
+        // }
+        // printf("\n");
+        // exit(0);
 
         if (r->error == 0) write_response(client, "200 OK", r->body);
         else write_response(client, "500 Internal Server Error", "Internal server error");
@@ -446,7 +461,7 @@ int callback_func(void *callback_data, int num_columns, char** values, char** co
         else {
             r->body = buff;
             r->capacity += mem_body;
-            r->body[r->capacity] = '\0'; // not sure about that
+            // r->body[r->capacity] = '\0'; // not sure about that
         }
     }
 
@@ -631,17 +646,17 @@ int write_response(Clients *client, char *status_code, char *body) {
     char *buff_send;    
 
     if (body != NULL) {
-        size_t len = strlen(body);
+        // size_t len = strlen(body);
 
         mem_alloc += snprintf(NULL, 0, "HTTP/1.1 %s\r\n", status_code);
-        mem_alloc += snprintf(NULL, 0, "Content-Length: %ld\r\n\r\n", len);
-        mem_alloc += len + strlen("Content-Type: application/json\r\n");
+        mem_alloc += snprintf(NULL, 0, "Content-Length: %ld\r\n\r\n", r->pos_body);
+        mem_alloc += r->pos_body + strlen("Content-Type: application/json\r\n");
 
         buff_send = malloc(mem_alloc);
 
         pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n", status_code);
         pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Type: application/json\r\n");
-        pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Length: %ld\r\n\r\n", len);
+        pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Length: %ld\r\n\r\n", r->pos_body);
         pos += snprintf(buff_send + pos, mem_alloc - pos, "%s", body);
     }
     else {
