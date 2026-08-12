@@ -70,7 +70,7 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass);
 char *hashing_passwd(Clients *client, char *pass);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r, char *pass);
 int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r);
-int write_response(Clients *client, char *status_code, char *body);
+int write_response(Clients *client, char *status_code, char *body, int len);
 
 int main(void) {
     int sockfd;
@@ -193,8 +193,9 @@ int handle_client_data(Clients *client, char *buff, int rcv_srvr) {
     }
     else {
         char *buff_temp = realloc(client->buff, client->position+rcv_srvr+1);
-        if (buff_temp == NULL) {   
-            write_response(client, "500 Internal Server Error", "Internal server error");
+        if (buff_temp == NULL) {  
+            int len = strlen("Internal server error"); 
+            write_response(client, "500 Internal Server Error", "Internal server error", len);
             return 0;
         }
         else {
@@ -284,7 +285,10 @@ int http_header_parse(Clients *client) {
             strncpy(temp_pass, position, counter);
             temp_pass[counter] = '\0';
         }  
-        else write_response(client, "400 Bad Request", "{\"error\":\"Password exceeds maximum length.\"}\n");  
+        else {
+            int len = strlen("{\"error\":\"Password exceeds maximum length.\"}");
+            write_response(client, "400 Bad Request", "{\"error\":\"Password exceeds maximum length.\"}", len);  
+        }
     }
      
     free(client->buff);
@@ -325,8 +329,8 @@ int handle_request(Clients *client, char *pass) {
 
 int handle_health(Clients *client, Response *r) {
     server.requests++;
-
-    write_response(client, "200 OK", "{\"status\": \"ok\"}\n");
+    int len = strlen("{\"status\": \"ok\"}");
+    write_response(client, "200 OK", "{\"status\": \"ok\"}", len);
 
     return 0;
 }
@@ -337,8 +341,8 @@ int handle_metrics(Clients *client, Response *r) {
     int time_diff = difftime(now_2, server.now);
 
     char uptime[BUFF_SIZE];
-    snprintf(uptime, BUFF_SIZE, "{\"uptime\": %d, \"requests\": %d}\n", time_diff, server.requests);
-    write_response(client, "200 OK", uptime);
+    int len = snprintf(uptime, BUFF_SIZE, "{\"uptime\": %d, \"requests\": %d}", time_diff, server.requests);
+    write_response(client, "200 OK", uptime, len);
 
     return 0;
 }
@@ -365,7 +369,8 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);  
 
             if (sqlite3_step(ppStmt) != SQLITE_ROW) { 
-                write_response(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
+                int len = strlen("{\"error\": \"User not found\"}");
+                write_response(client, "404 Not Found", "{\"error\": \"User not found\"}", len);
                 sqlite3_finalize(ppStmt);
                 return 0;
             }
@@ -397,8 +402,8 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
         // printf("\n");
         // exit(0);
 
-        if (r->error == 0) write_response(client, "200 OK", r->body);
-        else write_response(client, "500 Internal Server Error", "Internal server error");
+        if (r->error == 0) write_response(client, "200 OK", r->body, r->pos_body);
+        else write_response(client, "500 Internal Server Error", "Internal server error", strlen("Internal server error"));
 
     }
     else if (strcmp(client->method_arr, "POST") == 0) {
@@ -437,9 +442,9 @@ int db_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
 
     char db_body[BUFF_SIZE];
     memset(db_body, 0, BUFF_SIZE);
-    snprintf(db_body, BUFF_SIZE, "{\"uuid\":\"%s\"}\n", out);
+    int len = snprintf(db_body, BUFF_SIZE, "{\"uuid\":\"%s\"}", out);
 
-    write_response(client, "201 Created", db_body);
+    write_response(client, "201 Created", db_body, len);
 
     return 0;
 }
@@ -482,14 +487,16 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     memset(buff_db, 0, sizeof(buff_db));
 
     if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
-        write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
+        int len = strlen("{\"error\": \"Unauthorized\"}");
+        write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}", len);
         jwt_free(jwt);
         return 0;
     }   
 
     if (jwt_get_grant_int(jwt, "adm") != 0) { 
         if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-            write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}\n");
+            int len = strlen("{\"error\": \"Unauthorized\"}");
+            write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}", len);
             jwt_free(jwt);
             return 0; 
         }
@@ -505,9 +512,10 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
     
 
     if (sqlite3_changes(sql_db) == 0) {
-        write_response(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
+        int len = strlen("{\"error\": \"User not found\"}");
+        write_response(client, "404 Not Found", "{\"error\": \"User not found\"}", len);
     }
-    else write_response(client, "204 No Content", NULL);
+    else write_response(client, "204 No Content", NULL, 0);
     
 
     jwt_free(jwt);
@@ -524,14 +532,16 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     memset(buff_db, 0, sizeof(buff_db));
 
     if (jwt_decode(&jwt, client->token_arr, jwt_key, strlen(jwt_key)) != 0) {
-        write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized1\"}\n");
+        int len = strlen("{\"error\": \"Unauthorized2\"}");
+        write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized1\"}", len);
         jwt_free(jwt);
         return 0;
     }    
 
     if (jwt_get_grant_int(jwt, "adm") == 0) { 
         if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
-            write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized2\"}\n");
+            int len = strlen("{\"error\": \"Unauthorized2\"}");
+            write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized2\"}", len);
             jwt_free(jwt);
             return 0; 
         }
@@ -562,9 +572,10 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     }
    
     if (sqlite3_changes(sql_db) == 0) {
-        write_response(client, "404 Not Found", "{\"error\": \"User not found\"}\n");
+        int len = strlen("{\"error\": \"User not found\"}");
+        write_response(client, "404 Not Found", "{\"error\": \"User not found\"}", len);
     }
-    else write_response(client, "204 No Content", NULL);
+    else write_response(client, "204 No Content", NULL, 0);
     jwt_free(jwt);
     return 0;
 }
@@ -575,7 +586,8 @@ char *hashing_passwd(Clients *client, char *pass) {
     unsigned long long passlen = strlen(pass);
 
     if (crypto_pwhash_str(out, pass, passlen, crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) {
-        write_response(client, "500 Internal Server Error", "{\"error\": \"Internal server error\"}\n");   
+        int len = strlen("{\"error\": \"Internal server error\"}");
+        write_response(client, "500 Internal Server Error", "{\"error\": \"Internal server error\"}", len);   
     }
 
     return out;
@@ -594,7 +606,8 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     sqlite3_stmt *ppStmt;
     sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);    
     if (sqlite3_step(ppStmt) != SQLITE_ROW) {
-        write_response(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}\n");   
+        int len = strlen("{\"error\": \"Invalid credentials\"}");
+        write_response(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}", len);   
         sqlite3_finalize(ppStmt);
         return 0;
     }
@@ -605,7 +618,8 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     }   
 
     if (crypto_pwhash_str_verify (hashed_password, pass, strlen(pass)) != 0) {
-        write_response(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}\n");
+        int len = strlen("{\"error\": \"Invalid credentials\"}");
+        write_response(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}", len);
     }
     else {
         JWT_Token(client, user_id, is_admin, r);
@@ -631,32 +645,31 @@ int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r) {
 
     char jwt_body[BUFF_SIZE*5];
     memset(jwt_body, 0, BUFF_SIZE*5);
-    snprintf(jwt_body, BUFF_SIZE*5, "{\"token\": \"%s\"}\n", signed_token_str);
+    int len = snprintf(jwt_body, BUFF_SIZE*5, "{\"token\": \"%s\"}", signed_token_str);
     
-    write_response(client, "200 OK", jwt_body);
+    write_response(client, "200 OK", jwt_body, len);
     
     jwt_free(jwt);
     return 0;
 }
 
-int write_response(Clients *client, char *status_code, char *body) {
+int write_response(Clients *client, char *status_code, char *body, int len) {
 
     int pos = 0;
     int mem_alloc = 1;
     char *buff_send;    
 
     if (body != NULL) {
-        // size_t len = strlen(body);
 
         mem_alloc += snprintf(NULL, 0, "HTTP/1.1 %s\r\n", status_code);
-        mem_alloc += snprintf(NULL, 0, "Content-Length: %ld\r\n\r\n", r->pos_body);
-        mem_alloc += r->pos_body + strlen("Content-Type: application/json\r\n");
+        mem_alloc += snprintf(NULL, 0, "Content-Length: %d\r\n\r\n", len);
+        mem_alloc += len + strlen("Content-Type: application/json\r\n");
 
         buff_send = malloc(mem_alloc);
 
         pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n", status_code);
         pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Type: application/json\r\n");
-        pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Length: %ld\r\n\r\n", r->pos_body);
+        pos += snprintf(buff_send + pos, mem_alloc - pos, "Content-Length: %d\r\n\r\n", len);
         pos += snprintf(buff_send + pos, mem_alloc - pos, "%s", body);
     }
     else {
