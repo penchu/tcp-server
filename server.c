@@ -387,12 +387,13 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
         
         
         if (r->body[1] != '\0') {
-            r->pos_body = r->pos_body - 2;
-            r->body[r->pos_body] = ']';
+            r->body[r->pos_body-2] = ']';
+            r->body[r->pos_body-1] = '\0';
+            r->pos_body--;
             // r->body[r->pos_body-1] = '\n';            
         }
         else {
-            r->body[1] = ']';
+            r->body[r->pos_body] = ']';
             r->pos_body++;
             // r->body[2] = '\n';
         }
@@ -678,7 +679,6 @@ int write_response(Clients *client, char *status_code, char *body, int len) {
         buff_send = malloc(mem_alloc);
         pos += snprintf(buff_send, mem_alloc, "HTTP/1.1 %s\r\n\r\n", status_code);
     }
-    
     send(client->cl_fd, buff_send, pos, 0);
     free(buff_send);
 
