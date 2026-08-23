@@ -353,10 +353,9 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     
     if (strcmp(client->method_arr, "GET") == 0) {
         r->body = calloc(BUFF_DB_SIZE+1, 1);
-
         r->capacity += BUFF_DB_SIZE;
-        r->body[0] = '[';
-        r->pos_body++;
+        // r->body[0] = '[';
+        // r->pos_body++;
 
         char *uuid;
         if ((uuid = strstr(client->path_arr, "users/"))) {  
@@ -365,7 +364,7 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             char buff_db[BUFF_DB_SIZE];
             memset(buff_db, 0, sizeof(buff_db));
             snprintf(buff_db, BUFF_DB_SIZE, "SELECT username, timestamp FROM users WHERE UUID = ('%s')", uuid);
-
+            
             sqlite3_stmt *ppStmt;
             sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);  
 
@@ -378,31 +377,35 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             else {
                 const char *username = sqlite3_column_text(ppStmt, 0);
                 const char *timestamp = sqlite3_column_text(ppStmt, 1);
-                snprintf(r->body, r->capacity, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"},\n",
+                r->pos_body += snprintf(r->body, r->capacity, "{\"uuid\":\"%s\",\"username\":\"%s\",\"timestamp\":\"%s\"}",
                         uuid, username, timestamp);     
             }
             sqlite3_finalize(ppStmt);
         }
-        else sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
-        
-        
-        if (r->body[1] != '\0') {
-            r->body[r->pos_body-2] = ']';
-            r->body[r->pos_body-1] = '\0';
-            r->pos_body--;
-            // r->body[r->pos_body-1] = '\n';            
-        }
-        else {
-            r->body[r->pos_body] = ']';
+        else {            
+            r->body[0] = '[';
             r->pos_body++;
-            // r->body[2] = '\n';
-        }
-
-        // for (int i = 0; r->body[i] != '\0'; i++) {
-        //     printf("%02x ", r->body[i]);
+            sqlite3_exec(sql_db, "SELECT * FROM users", callback_func, (void *)r, NULL);
+            if (r->body[1] != '\0') {
+                r->body[r->pos_body-2] = ']';
+                r->body[r->pos_body-1] = '\0';
+                r->pos_body--;          
+            }
+            else {
+                r->body[r->pos_body] = ']';
+                r->pos_body++;
+            }
+        }        
+        
+        // if (r->body[1] != '\0') {
+        //     r->body[r->pos_body-2] = ']';
+        //     r->body[r->pos_body-1] = '\0';
+        //     r->pos_body--;          
         // }
-        // printf("\n");
-        // exit(0);
+        // else {
+        //     r->body[r->pos_body] = ']';
+        //     r->pos_body++;
+        // }
 
         if (r->error == 0) write_response(client, "200 OK", r->body, r->pos_body);
         else write_response(client, "500 Internal Server Error", "Internal server error", strlen("Internal server error"));

@@ -7,7 +7,7 @@ curl -v -w '\n' http://localhost:8080/users
 curl -v -w '\n' http://localhost:8080/users/uuid
 
 # Add new user POST:
-curl -H -w '\n' 'Content-Type: application/json' -d '{ "username":"penchu", "password":"abcd" }' -X POST -v http://localhost:8080/users
+curl -H 'Content-Type: application/json' -w '\n' -d '{ "username":"penchu", "password":"abcd" }' POST -v http://localhost:8080/users
 
 # Update user:
 curl -v -w '\n' -X PUT -H "Content-Type: application/json" -d '{"username":"penchu","password":"abcd"}' http://localhost:8080/users/UUID -H "Authorization: Bearer $TOKEN"
