@@ -291,7 +291,8 @@ int http_header_parse(Clients *client) {
             write_response(client, "400 Bad Request", "{\"error\":\"Password exceeds maximum length.\"}", len);  
         }
     }
-     
+    printf("pass: %s\n", temp_pass);
+    // exit(0);
     free(client->buff);
     handle_request(client, temp_pass);
     
@@ -555,10 +556,12 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
                 snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
                 sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
             }    
-            if (client->password[0] != '\0') {
+            // if (client->password[0] != '\0') {
+            if (pass) {
                 memset(buff_db, 0, sizeof(buff_db));
                 char *password = hashing_passwd(client, pass);
-                snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);     
+                snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);    
+                // snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", pass, uuid);  
                 sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
             }
         }
@@ -612,7 +615,7 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     sqlite3_prepare_v2(sql_db, buff_db, BUFF_DB_SIZE, &ppStmt, NULL);    
     if (sqlite3_step(ppStmt) != SQLITE_ROW) {
         int len = strlen("{\"error\": \"Invalid credentials\"}");
-        write_response(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}", len);   
+        write_response(client, "401 Unauthorized1", "{\"error\": \"Invalid credentials\"}", len);   
         sqlite3_finalize(ppStmt);
         return 0;
     }
@@ -624,7 +627,7 @@ int handle_login(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
 
     if (crypto_pwhash_str_verify (hashed_password, pass, strlen(pass)) != 0) {
         int len = strlen("{\"error\": \"Invalid credentials\"}");
-        write_response(client, "401 Unauthorized", "{\"error\": \"Invalid credentials\"}", len);
+        write_response(client, "401 Unauthorized2", "{\"error\": \"Invalid credentials\"}", len);
     }
     else {
         JWT_Token(client, user_id, is_admin, r);
