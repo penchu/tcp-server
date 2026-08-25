@@ -291,7 +291,7 @@ int http_header_parse(Clients *client) {
             write_response(client, "400 Bad Request", "{\"error\":\"Password exceeds maximum length.\"}", len);  
         }
     }
-    printf("pass: %s\n", temp_pass);
+    // printf("pass: %s\n", temp_pass);
     // exit(0);
     free(client->buff);
     handle_request(client, temp_pass);
@@ -499,7 +499,7 @@ int DEL_users(sqlite3 *sql_db, Clients *client, Response *r) {
         return 0;
     }   
 
-    if (jwt_get_grant_int(jwt, "adm") != 0) { 
+    if (jwt_get_grant_int(jwt, "adm") == 0) { 
         if (strcmp(jwt_get_grant(jwt, "sub"), uuid) != 0) {
             int len = strlen("{\"error\": \"Unauthorized\"}");
             write_response(client, "401 Unauthorized", "{\"error\": \"Unauthorized\"}", len);
