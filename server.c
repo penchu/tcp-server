@@ -12,6 +12,7 @@
 #include <sodium.h>
 #include <jwt.h>
 #include <errno.h>
+#include "log.h"
 
 #define MAX_CLIENTS 10
 #define BUFF_SIZE 128
@@ -74,8 +75,9 @@ int write_response(Clients *client, char *status_code, char *body, int len);
 int log_event();
 
 int main(void) {
-    int sockfd;
+    int sockfd;    
     
+    log_init();
     server_init(&sockfd);
     server_run(&sockfd);   
 
