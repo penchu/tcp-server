@@ -1,19 +1,43 @@
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
 #include "log.h"
+
+#define BUFF_SIZE 128
 
 static FILE *log_fp = NULL;
 
-int log_init();
-int log_close();
+void log_init(void);
+void log_info(char *body);
+void log_error(char *body);
+void timestamp(char *buff);
+void log_close(void);
 
-int log_init() {
-    
-    log_fp = fopen("logs.log", "a");
-    return 0;
+void log_init(void) {
+    log_fp = fopen("logs.log", "a");;
 }
 
-int log_close() {
+void log_info(char *body) {    
+    char buff_time[BUFF_SIZE];
+    memset(buff_time, 0, sizeof(buff_time));
+    timestamp(buff_time);
+    fprintf(log_fp, "%s [INFO] %s\n", buff_time, body);
+}
+
+void log_error(char *body) {
+    char buff_time[BUFF_SIZE];
+    memset(buff_time, 0, sizeof(buff_time));
+    timestamp(buff_time);
+    fprintf(log_fp, "%s [ERROR] %s\n", buff_time, body);
+}
+
+void timestamp(char *buff) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buff, sizeof(buff), "%d-%m-%Y %H:%M:%S", t);
+}
+
+void log_close() {
     fclose(log_fp);
     log_fp = NULL;
-    return 0;
 }

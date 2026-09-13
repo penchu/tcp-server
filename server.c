@@ -72,7 +72,6 @@ char *hashing_passwd(Clients *client, char *pass);
 int handle_login(sqlite3 *sql_db, Clients *client, Response *r, char *pass);
 int JWT_Token(Clients *client, const char *user_id, int is_admin, Response *r);
 int write_response(Clients *client, char *status_code, char *body, int len);
-int log_event();
 
 int main(void) {
     int sockfd;    
@@ -82,7 +81,7 @@ int main(void) {
     server_run(&sockfd);   
 
     close(sockfd);
-    
+    log_close();
     return 0;
 }
 
@@ -690,10 +689,10 @@ int write_response(Clients *client, char *status_code, char *body, int len) {
     send(client->cl_fd, buff_send, pos, 0);
     free(buff_send);
 
-    return 0;
-}
-
-int log_event() {
+    char buff_log[BUFF_SIZE*4];
+    memset(buff_log, 0, sizeof(buff_log));
+    snprintf(buff_log, BUFF_SIZE*4, "%s %s %s", client->method_arr, client->path_arr, status_code);
+    log_info(buff_log);
 
     return 0;
 }
