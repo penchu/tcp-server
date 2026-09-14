@@ -14,7 +14,7 @@ void timestamp(char *buff);
 void log_close(void);
 
 void log_init(void) {
-    log_fp = fopen("logs.log", "a");;
+    log_fp = fopen("logs.log", "a");
 }
 
 void log_info(char *body) {    
@@ -22,6 +22,7 @@ void log_info(char *body) {
     memset(buff_time, 0, sizeof(buff_time));
     timestamp(buff_time);
     fprintf(log_fp, "%s [INFO] %s\n", buff_time, body);
+    fflush(log_fp);
 }
 
 void log_error(char *body) {
@@ -34,7 +35,8 @@ void log_error(char *body) {
 void timestamp(char *buff) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
-    strftime(buff, sizeof(buff), "%d-%m-%Y %H:%M:%S", t);
+    strftime(buff, BUFF_SIZE, "%d-%m-%Y %H:%M:%S", t);
+    printf("time: %s\n", buff);
 }
 
 void log_close() {
