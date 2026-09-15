@@ -30,13 +30,13 @@ void log_error(char *body) {
     memset(buff_time, 0, sizeof(buff_time));
     timestamp(buff_time);
     fprintf(log_fp, "%s [ERROR] %s\n", buff_time, body);
+    fflush(log_fp);
 }
 
 void timestamp(char *buff) {
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     strftime(buff, BUFF_SIZE, "%d-%m-%Y %H:%M:%S", t);
-    printf("time: %s\n", buff);
 }
 
 void log_close() {

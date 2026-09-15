@@ -88,12 +88,14 @@ int main(void) {
 int server_init(int *sockfd) {
     if ((*sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket");
+        log_error("Failed to create socket");
         return -1;
     }
     
     int opt = 1;
     if (setsockopt(*sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("setsockopt");
+        log_error("Failed to set the socket options");
         return -1;
     } //should tell the OS to let you reuse the port even if it's in TIME_WAIT.
 
@@ -105,11 +107,13 @@ int server_init(int *sockfd) {
     if (bind(*sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("bind");
         close(*sockfd);
+        log_error("Failed to bind socket");
         return -1;
     }
     
     if (listen(*sockfd, 15) < 0) {
         perror("listen");
+        log_error("Failed to listen on socket");
         return -1;
     }
        
@@ -144,6 +148,7 @@ int server_run(int *sockfd) {
         sel_val = select((max_fd+1), &read_set, NULL, NULL, NULL);
         if (sel_val < 0) {
             perror("select");
+            log_error("Failed to monitor socket activity");
             continue;
         }
         
@@ -156,6 +161,7 @@ int server_run(int *sockfd) {
                     rcv_srvr = recv(i, buff, sizeof(buff)-1, 0);
                     if (rcv_srvr < 0) {
                         perror("receive");
+                        log_error("Failed to receive data");
                         continue;
                     }
                     else if (rcv_srvr > 0) {
@@ -181,6 +187,7 @@ int handle_new_client(int *sockfd, int *max_fd, fd_set *master_set) {
     int clientfd = accept(*sockfd, (struct sockaddr *) &peer_addr, &peer_addr_size); 
     if (clientfd < 0) {
         perror("accept");
+        log_error("Failed to accept a connection");
         return -1;
     }  
     if (clientfd > *max_fd) *max_fd = clientfd;   
@@ -356,9 +363,6 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
     if (strcmp(client->method_arr, "GET") == 0) {
         r->body = calloc(BUFF_DB_SIZE+1, 1);
         r->capacity += BUFF_DB_SIZE;
-        // r->body[0] = '[';
-        // r->pos_body++;
-
         char *uuid;
         if ((uuid = strstr(client->path_arr, "users/"))) {  
             uuid += strlen("users/");
@@ -398,16 +402,6 @@ int handle_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
                 r->pos_body++;
             }
         }        
-        
-        // if (r->body[1] != '\0') {
-        //     r->body[r->pos_body-2] = ']';
-        //     r->body[r->pos_body-1] = '\0';
-        //     r->pos_body--;          
-        // }
-        // else {
-        //     r->body[r->pos_body] = ']';
-        //     r->pos_body++;
-        // }
 
         if (r->error == 0) write_response(client, "200 OK", r->body, r->pos_body);
         else write_response(client, "500 Internal Server Error", "Internal server error", strlen("Internal server error"));
@@ -556,13 +550,11 @@ int UPDATE_users(sqlite3 *sql_db, Clients *client, Response *r, char *pass) {
             if (client->username[0] != '\0') {
                 snprintf(buff_db, sizeof(buff_db), "UPDATE users SET username = '%s' WHERE UUID= '%s'", client->username, uuid);     
                 sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
-            }    
-            // if (client->password[0] != '\0') {
+            } 
             if (pass) {
                 memset(buff_db, 0, sizeof(buff_db));
                 char *password = hashing_passwd(client, pass);
                 snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", password, uuid);    
-                // snprintf(buff_db, sizeof(buff_db), "UPDATE users SET password = '%s' WHERE UUID= '%s'", pass, uuid);  
                 sqlite3_exec(sql_db, buff_db, NULL, NULL, NULL);
             }
         }
@@ -692,7 +684,9 @@ int write_response(Clients *client, char *status_code, char *body, int len) {
     char buff_log[BUFF_SIZE*4];
     memset(buff_log, 0, sizeof(buff_log));
     snprintf(buff_log, BUFF_SIZE*4, "%s %s %s", client->method_arr, client->path_arr, status_code);
-    log_info(buff_log);
+    
+    if (status_code[0] == '2') log_info(buff_log);
+    else log_error(buff_log);
 
     return 0;
 }
